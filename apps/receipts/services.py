@@ -51,6 +51,9 @@ def save_draft(owner, draft, expected_version, data):
             raise BusinessRuleError("This receipt has already been handled.")
         if parse_version(expected_version) != locked.version:
             raise StaleObjectError()
+        # Keep extraction metadata (currency, flags) when the owner saves their edits.
+        if "extraction" in (locked.data or {}) and "extraction" not in data:
+            data = {**data, "extraction": locked.data["extraction"]}
         locked.data = data
         locked.version += 1
         locked.save(update_fields=["data", "version", "updated_at"])
@@ -97,3 +100,33 @@ def discard_draft(owner, draft, expected_version):
         locked.version += 1
         locked.save(update_fields=["review_status", "version", "updated_at"])
         return locked
+
+
+def _merchant_key(value):
+    return "".join(ch for ch in (value or "").lower() if ch.isalnum())
+
+
+def find_similar_purchases(owner, purchase_input, document=None, window_days=3):
+    """Possible duplicates: a warning, never proof. Owner-scoped, confirmed purchases only.
+
+    Returns a list of (purchase, reason) pairs.
+    """
+    import datetime
+
+    results = {}
+    if document is not None:
+        for evidence in PurchaseEvidence.objects.filter(
+            document__owner=owner, document__checksum=document.checksum, purchase__status=Purchase.Status.CONFIRMED
+        ).exclude(document=document).select_related("purchase"):
+            results[evidence.purchase.pk] = (evidence.purchase, "The same receipt file is already attached to this purchase.")
+    if purchase_input is not None and purchase_input.transaction_date and purchase_input.total is not None:
+        delta = datetime.timedelta(days=window_days)
+        key = _merchant_key(purchase_input.merchant)
+        for purchase in Purchase.objects.filter(
+            owner=owner, kind=Purchase.Kind.PURCHASE, status=Purchase.Status.CONFIRMED, total=purchase_input.total,
+            transaction_date__range=(purchase_input.transaction_date - delta, purchase_input.transaction_date + delta),
+        ):
+            other = _merchant_key(purchase.merchant)
+            if not key or not other or key in other or other in key:
+                results.setdefault(purchase.pk, (purchase, "Same total, a similar date and merchant."))
+    return sorted(results.values(), key=lambda pair: pair[0].transaction_date, reverse=True)

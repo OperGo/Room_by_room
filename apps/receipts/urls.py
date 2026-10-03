@@ -11,5 +11,8 @@ urlpatterns = [
     path("<uuid:uuid>/confirm/", views.receipt_confirm, name="confirm"),
     path("<uuid:uuid>/attach/", views.receipt_attach, name="attach"),
     path("<uuid:uuid>/discard/", views.receipt_discard, name="discard"),
+    path("<uuid:uuid>/read/", views.receipt_read, name="read"),
+    path("<uuid:uuid>/reading.json", views.receipt_reading_status, name="reading_status"),
+    path("<uuid:uuid>/apply-reading/", views.receipt_apply_reading, name="apply_reading"),
     path("file/<uuid:uuid>/", views.receipt_file, name="file"),
 ]

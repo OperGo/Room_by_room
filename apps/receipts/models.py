@@ -39,28 +39,53 @@ class ReceiptDocument(models.Model):
         return self.mime == "application/pdf"
 
 
+class ExtractionJobQuerySet(models.QuerySet):
+    def for_owner(self, user):
+        return self.filter(document__owner=user)
+
+
 class ExtractionJob(models.Model):
-    """Persisted extraction work item, processed outside the web request (Sprint 2)."""
+    """Persisted extraction work item, processed by ``manage.py process_receipts`` (never in a web request).
+
+    A job never creates cost. Its result is applied to the draft only when the draft
+    is still open and unchanged since reading was requested; otherwise it is held.
+    """
 
     class Status(models.TextChoices):
-        QUEUED = "queued", "Queued"
-        PROCESSING = "processing", "Processing"
-        SUCCEEDED = "succeeded", "Ready for review"
-        FAILED = "failed", "Failed"
+        QUEUED = "queued", "Waiting to be read"
+        PROCESSING = "processing", "Reading"
+        SUCCEEDED = "succeeded", "Read"
+        FAILED = "failed", "Could not be read"
+
+    class ResultState(models.TextChoices):
+        NONE = "none", "No result"
+        APPLIED = "applied", "Applied to the draft"
+        HELD = "held", "Held: draft changed while reading"
+        DISCARDED = "discarded", "Not applied: receipt already handled"
 
     document = models.ForeignKey(ReceiptDocument, on_delete=models.CASCADE, related_name="jobs")
+    draft = models.ForeignKey("receipts.ReceiptDraft", on_delete=models.CASCADE, related_name="jobs", null=True)
+    requested_draft_version = models.PositiveIntegerField(default=1)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.QUEUED)
     adapter = models.CharField(max_length=40, blank=True)
     model_version = models.CharField(max_length=80, blank=True)
     attempts = models.PositiveSmallIntegerField(default=0)
     max_attempts = models.PositiveSmallIntegerField(default=2)
+    claim_token = models.UUIDField(null=True, blank=True)
     lease_expires_at = models.DateTimeField(null=True, blank=True)
-    draft_json = models.JSONField(null=True, blank=True)
+    available_at = models.DateTimeField(null=True, blank=True, help_text="Earliest time a retry may be claimed.")
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    draft_json = models.JSONField(null=True, blank=True, help_text="Normalised draft values (never read by cost totals).")
     warnings = models.JSONField(default=list, blank=True)
+    error_code = models.CharField(max_length=40, blank=True)
     error = models.CharField(max_length=300, blank=True)
     usage = models.JSONField(default=dict, blank=True)
+    result_state = models.CharField(max_length=10, choices=ResultState.choices, default=ResultState.NONE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = ExtractionJobQuerySet.as_manager()
 
     class Meta:
         ordering = ["-created_at"]
@@ -69,7 +94,12 @@ class ExtractionJob(models.Model):
             models.UniqueConstraint(
                 fields=["document"], condition=Q(status__in=["queued", "processing"]), name="one_active_job_per_document"
             ),
+            models.CheckConstraint(condition=Q(attempts__lte=models.F("max_attempts")), name="job_attempts_bounded"),
         ]
+
+    @property
+    def is_active(self):
+        return self.status in (self.Status.QUEUED, self.Status.PROCESSING)
 
 
 class ReceiptDraftQuerySet(models.QuerySet):

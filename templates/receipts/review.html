@@ -5,9 +5,9 @@
 <header class="page-head">
   <h1 class="page-title">Review receipt</h1>
   <p class="subtitle">Check the details before confirming.</p>
-  <p class="review-status"><span class="badge badge-draft badge-dot">Draft · not confirmed</span>
-    <span class="small muted">{% if extraction_available %}Values were read automatically: check each one.{% else %}{{ extraction_message }}{% endif %}</span></p>
+  <p class="review-status"><span class="badge badge-draft badge-dot">Draft · not confirmed</span></p>
 </header>
+{% include "receipts/_reading.html" %}
 {% if duplicates %}<div class="alert alert-warning">{% icon "triangle-alert" 18 %}<div>This exact file was uploaded before{% for d in duplicates %}{% if d.draft %} (<a href="{% url 'receipts:review' d.draft.uuid %}">{{ d.created_at|date:"j M Y" }}</a>, {{ d.draft.get_review_status_display|lower }}){% endif %}{% endfor %}. Check you are not recording it twice.</div></div>{% endif %}
 {% include "includes/purchase_editor_alerts.html" %}
 
@@ -31,6 +31,24 @@
   <div class="ed-body">
     <hr class="section-rule" style="margin-top:4px">
     {% include "includes/purchase_editor_body.html" %}
+    {% if extraction.offer_unitemised %}<p><button type="button" class="btn btn-ghost btn-sm" data-unitemised="{{ editor.header.total }}">{% icon "plus" 16 %}Use one “Unitemised purchase” line for the total</button></p>{% endif %}
+    {% if extraction.gbp_confirmation_required %}
+    <div class="card card-pad gbp-check">
+      {% if extraction.foreign_total %}<p class="small" style="margin:0 0 6px">The receipt shows <strong>{{ extraction.foreign_total }}</strong>. Amounts were not filled in: enter what you paid in pounds.</p>
+      {% else %}<p class="small" style="margin:0 0 6px">No currency was shown on the receipt.</p>{% endif %}
+      <label class="check"><input type="checkbox" name="gbp_confirmed" value="1" {% if request.POST.gbp_confirmed == "1" %}checked{% endif %}><span>All amounts above are in pounds sterling (GBP)</span></label>
+    </div>
+    {% endif %}
+    {% if similar_purchases %}
+    <div class="card card-pad dup-check" id="duplicates">
+      <h2 style="font-size:17px">Possible duplicate</h2>
+      <p class="small muted" style="margin:4px 0 8px">A similar purchase is already recorded. Similar does not mean identical: confirm only if this is a separate purchase. Otherwise attach this receipt to it below.</p>
+      {% for p, reason in similar_purchases %}
+      <label class="check"><input type="checkbox" name="ack_duplicate" value="{{ p.uuid }}" {% if p.uuid|stringformat:"s" in acknowledged %}checked{% endif %}>
+        <span><a href="{% url 'costs:purchase_detail' p.uuid %}" target="_blank" rel="noopener">{{ p.description }}</a> · {{ p.transaction_date|date:"j M Y" }} · {{ p.total|gbp }}{% if p.merchant %} · {{ p.merchant }}{% endif %}<br><span class="small muted">{{ reason }} This is a separate purchase.</span></span></label>
+      {% endfor %}
+    </div>
+    {% endif %}
     <div class="sticky-cta confirm-row">
       <button class="text-btn" type="submit" formaction="{% url 'receipts:discard' draft.uuid %}?retake=1" formnovalidate data-confirm="Discard this photo and take a new one? Nothing has been recorded.">Retake photo</button>
       <button class="btn btn-wide" type="submit" data-submit-once>Confirm purchase</button>

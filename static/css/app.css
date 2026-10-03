@@ -570,3 +570,16 @@ details.line-more > summary, details.disclosure > summary { min-height: var(--ta
   .alloc-row:not(.single) .dest-wrap { grid-column: 1 / -1; }
 }
 .group-bar { min-height: var(--tap); }
+
+/* ================================================================== Sprint 2: reading states */
+.reading-panel { margin: 0 0 14px; }
+.reading-panel .alert { margin-bottom: 0; }
+.reading-offer { display: grid; gap: 4px; }
+.reading-offer .btn { width: 100%; }
+.spinner { width: 18px; height: 18px; flex: none; border-radius: 999px; border: 2.5px solid var(--sage-strong); border-top-color: var(--primary); animation: spin 0.9s linear infinite; margin-top: 2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+.line-flags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.gbp-check, .dup-check { margin-top: 12px; border-color: #EAD9B0; background: var(--ochre-tint); }
+.dup-check .check, .gbp-check .check { align-items: flex-start; }
+@media (min-width: 768px) { .reading-offer { grid-template-columns: auto 1fr; align-items: center; column-gap: 14px; } .reading-offer .btn { width: auto; } }

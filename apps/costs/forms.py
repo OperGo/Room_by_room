@@ -148,6 +148,8 @@ class PurchaseEditor:
                 "unit_price": (post.get(p + "unit_price") or "").strip(),
                 "amount": (post.get(p + "amount") or "").strip(),
                 "shopping": (post.get(p + "shopping") or "").strip(),
+                "flag": post.get(p + "flag") == "1",
+                "foreign": (post.get(p + "foreign") or "").strip()[:30],
                 "allocations": [],
             }
             for j in _indexes(post, f"{p}alloc-"):

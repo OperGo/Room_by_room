@@ -19,7 +19,7 @@
 </form>
 
 <div class="alert alert-info" style="max-width:860px;margin-top:8px">{% icon "info" 18 %}<div>
-  {% if extraction_available %}When you choose a file it is sent to the configured AI provider to read the receipt. You review everything before any cost is recorded.
+  {% if extraction_available %}Uploading only stores the file privately. On the next screen you can choose <strong>Read receipt automatically</strong>: {{ provider_note }}
   {% else %}<strong>{{ extraction_message }}</strong> Nothing is sent to an AI provider. Nothing counts towards your costs until you confirm the details.{% endif %}
 </div></div>
 

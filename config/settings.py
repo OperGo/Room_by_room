@@ -148,10 +148,18 @@ RECEIPT_MAX_PDF_PAGES = 5
 RECEIPT_MAX_LINES = 100
 IMAGE_MAX_PIXELS = 50_000_000
 
-# Receipt extraction (Sprint 2). Without a key the UI says extraction is not configured.
+# Receipt extraction. Reading is an explicit user action processed by
+# `manage.py process_receipts`; without a key the UI says it is not configured.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-RECEIPT_MODEL = os.environ.get("RECEIPT_MODEL", "")
-RECEIPT_EXTRACTION_ENABLED = False  # The real adapter lands in Sprint 2.
+RECEIPT_MODEL = os.environ.get("RECEIPT_MODEL", "")  # recommended: claude-haiku-4-5 (see docs/receipt-processing.md)
+RECEIPT_EXTRACTOR = os.environ.get("RECEIPT_EXTRACTOR", "anthropic")  # "fake" only for tests/labelled demos
+RECEIPT_TIMEOUT_SECONDS = float(os.environ.get("RECEIPT_TIMEOUT_SECONDS", "60"))
+RECEIPT_LEASE_SECONDS = int(os.environ.get("RECEIPT_LEASE_SECONDS", "180"))
+RECEIPT_MAX_ATTEMPTS = 2
+RECEIPT_RETRY_DELAY_SECONDS = int(os.environ.get("RECEIPT_RETRY_DELAY_SECONDS", "30"))
+RECEIPT_MAX_OUTPUT_TOKENS = 8192
+RECEIPT_IMAGE_LONG_EDGE = 1568  # standard-tier vision limit for claude-haiku-4-5
+RECEIPT_STALE_QUEUE_SECONDS = 120  # UI hint when no worker seems to be running
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

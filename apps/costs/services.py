@@ -130,7 +130,7 @@ def validate_purchase_input(owner, data: PurchaseInput):
         if lines_total != data.total:
             errors.append(
                 f"Items add up to {format_gbp(lines_total)} but the purchase total is {format_gbp(data.total)}. "
-                "Add a delivery, discount or rounding item, or correct the amounts."
+                "Add missing items or correct the amounts."
             )
     if not errors:
         for key, amount in destination_totals_from_input(data).items():

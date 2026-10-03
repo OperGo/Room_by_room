@@ -2,6 +2,9 @@
 <div class="line-card" data-line data-index="{{ i }}">
   <span class="visually-hidden" data-line-label>Line</span>
   <input type="hidden" name="line-{{ i }}-shopping" value="{{ line.shopping|default:'' }}">
+  <input type="hidden" name="line-{{ i }}-flag" value="{% if line.flag %}1{% endif %}">
+  <input type="hidden" name="line-{{ i }}-foreign" value="{{ line.foreign|default:'' }}">
+  {% if line.flag or line.foreign %}<p class="line-flags">{% if line.flag %}<span class="badge badge-warning">Check this line</span>{% endif %}{% if line.foreign %}<span class="badge badge-outline">Receipt: {{ line.foreign }}</span>{% endif %}</p>{% endif %}
   <div class="line-top">
     <label class="visually-hidden" for="l{{ i }}-desc">Item description</label>
     <input type="text" id="l{{ i }}-desc" name="line-{{ i }}-description" value="{{ line.description|default:'' }}" maxlength="160" placeholder="Item, e.g. MDF sheet">

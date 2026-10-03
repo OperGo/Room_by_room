@@ -122,3 +122,84 @@ def test_rollback_on_failure_leaves_no_rows(setup):
             services.post_purchase(owner, data)
     assert Purchase.objects.count() == 0
     assert OpeningCostBalance.objects.count() == 0
+
+
+# ------------------------------------------------------------------ Sprint 2: reading jobs
+
+
+@pytest.fixture
+def reading_draft(setup, settings):
+    settings.RECEIPT_EXTRACTOR = "fake"
+    owner, _ = setup
+    document = ReceiptDocument.objects.create(owner=owner, storage_key="k", checksum="c2", mime="image/jpeg", size=1)
+    return owner, ReceiptDraft.objects.create(owner=owner, document=document)
+
+
+def test_competing_claims_get_one_job_each(reading_draft):
+    from apps.receipts import jobs
+    from apps.receipts.models import ExtractionJob
+
+    owner, draft = reading_draft
+    jobs.request_reading(owner, draft, 1)
+    results, errors = run_concurrently(lambda: jobs.claim_next_job(), n=4)
+    assert not errors
+    claimed = [r for r in results if r is not None]
+    assert len(claimed) == 1
+    job = ExtractionJob.objects.get()
+    assert job.attempts == 1 and job.status == "processing"
+
+
+def test_concurrent_read_requests_create_one_active_job(reading_draft):
+    from apps.receipts import jobs
+    from apps.receipts.models import ExtractionJob
+
+    owner, draft = reading_draft
+    results, errors = run_concurrently(lambda: jobs.request_reading(owner, draft, 1), n=3)
+    assert not errors, errors
+    assert len({j.pk for j in results}) == 1
+    assert ExtractionJob.objects.count() == 1
+
+
+def test_job_finish_racing_owner_save_never_overwrites_edits(reading_draft):
+    from apps.receipts import jobs
+    from apps.receipts.extraction import SAMPLE_RESULT
+    from apps.receipts.normalise import normalise
+    from apps.receipts.services import save_draft
+
+    owner, draft = reading_draft
+    jobs.request_reading(owner, draft, 1)
+    job, token = jobs.claim_next_job()
+    data = normalise(SAMPLE_RESULT)
+    outcomes = {}
+
+    def finish():
+        outcomes["job"] = jobs.finish_success(job.pk, token, data, "m")
+
+    def save():
+        try:
+            outcomes["save"] = save_draft(owner, draft, 1, {"merchant": "Typed by owner", "lines": []})
+        except Exception as exc:  # noqa: BLE001
+            outcomes["save"] = exc
+
+    barrier = threading.Barrier(2)
+
+    def run(fn):
+        try:
+            barrier.wait()
+            fn()
+        finally:
+            connections.close_all()
+
+    threads = [threading.Thread(target=run, args=(fn,)) for fn in (finish, save)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(20)
+    draft.refresh_from_db()
+    job.refresh_from_db()
+    if job.result_state == "applied":
+        # The reading won; the owner's stale save was refused rather than silently mixed.
+        assert isinstance(outcomes["save"], Exception) and draft.data["merchant"] == "Sample Hardware Co"
+    else:
+        assert job.result_state == "held" and draft.data["merchant"] == "Typed by owner"
+    assert Purchase.objects.count() == 0

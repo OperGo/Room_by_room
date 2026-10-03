@@ -32,7 +32,7 @@ def test_upload_supported_formats_creates_draft_only(client_owner, owner, name, 
     assert Purchase.objects.count() == 0
     assert overall_summary(owner).total == Decimal("0.00")
     review = client_owner.get(response["Location"])
-    assert b"Draft" in review.content and b"not available yet" in review.content
+    assert b"Draft" in review.content and b"Automatic extraction not configured" in review.content
 
 
 def test_heic_gets_browser_preview(client_owner, owner):
@@ -213,7 +213,7 @@ def test_drafts_listed_separately_and_not_counted(client_owner, owner):
 
 
 def test_extraction_not_configured_message(client_owner, settings):
-    settings.RECEIPT_EXTRACTION_ENABLED = True
+    settings.RECEIPT_EXTRACTOR = "anthropic"
     settings.ANTHROPIC_API_KEY = ""
     body = client_owner.get(reverse("receipts:new")).content
     assert b"Automatic extraction not configured" in body

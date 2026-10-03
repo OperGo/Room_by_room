@@ -61,6 +61,67 @@
     });
   });
 
+  // Track unsaved typing so polling never discards it.
+  var formDirty = false;
+  document.querySelectorAll("form[data-editor-form]").forEach(function (form) {
+    form.addEventListener("input", function () { formDirty = true; });
+    form.addEventListener("change", function () { formDirty = true; });
+  });
+
+  // Receipt reading status: poll the job only; never touch form values.
+  document.querySelectorAll("[data-reading]").forEach(function (panel) {
+    var status = panel.getAttribute("data-status");
+    if (status !== "queued" && status !== "processing") return;
+    var url = panel.getAttribute("data-status-url");
+    var started = Date.now();
+    var label = panel.querySelector("[data-reading-label]");
+    var attempt = panel.querySelector("[data-reading-attempt]");
+    var stale = panel.querySelector("[data-reading-stale]");
+    var done = panel.querySelector("[data-reading-done]");
+    var dirtyNote = panel.querySelector("[data-reading-dirty]");
+    function tick() {
+      if (Date.now() - started > 10 * 60 * 1000) {
+        if (label) label.textContent = "Still not finished. Refresh later, or enter the details yourself.";
+        return;
+      }
+      fetch(url, { headers: { "Accept": "application/json" }, credentials: "same-origin", cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (state) {
+          if (!state) { window.setTimeout(tick, 5000); return; }
+          if (state.status === "queued" || state.status === "processing") {
+            if (label) label.textContent = state.status === "queued" ? "Waiting to read the receipt…" : "Reading the receipt…";
+            if (attempt) attempt.textContent = state.attempts ? "Attempt " + state.attempts + " of " + state.max_attempts + "." : "";
+            if (stale) stale.hidden = !state.stale_queue;
+            window.setTimeout(tick, 3000);
+            return;
+          }
+          if (!formDirty) { window.location.reload(); return; }
+          if (label) label.textContent = state.status === "failed" ? "Reading failed." : "Reading finished.";
+          if (done) done.hidden = false;
+          if (dirtyNote) dirtyNote.hidden = false;
+        })
+        .catch(function () { window.setTimeout(tick, 5000); });
+    }
+    window.setTimeout(tick, 2000);
+  });
+  document.querySelectorAll("[data-reading-reload]").forEach(function (link) {
+    link.addEventListener("click", function (event) { event.preventDefault(); window.location.reload(); });
+  });
+
+  // "Use one unitemised line": an explicit owner action, never automatic.
+  document.querySelectorAll("[data-unitemised]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var form = button.closest("form");
+      var line = form.querySelector("[data-line]");
+      if (!line) return;
+      line.querySelector("input[name$='-description']").value = "Unitemised purchase";
+      line.querySelector("[data-line-type]").value = "unitemised";
+      line.querySelector("select[name$='-category']").value = "other";
+      line.querySelector("[data-line-amount]").value = button.getAttribute("data-unitemised");
+      line.querySelector("input[name$='-description']").dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
+
   // Purchase editor.
   document.querySelectorAll("[data-purchase-editor]").forEach(function (editor) {
     var form = editor.closest("form");
@@ -127,7 +188,7 @@
       }
       if (linesSum !== target) {
         var diff = target - linesSum;
-        status.textContent = diff > 0 ? formatPence(diff) + " of the total is not itemised yet" : "Items are " + formatPence(-diff) + " more than the total";
+        status.textContent = (diff > 0 ? formatPence(diff) + " of the total is not itemised yet" : "Items are " + formatPence(-diff) + " more than the total") + ". Add missing items or correct the amounts.";
         box.classList.add("bad");
       } else if (allocated !== target || unassigned) {
         status.textContent = "Choose a project for every item"; box.classList.add("bad");

@@ -3,7 +3,7 @@ import uuid as uuid_lib
 from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
@@ -16,9 +16,9 @@ from apps.costs.forms import PurchaseEditor
 from apps.costs.models import Purchase
 from apps.costs.views import _editor_context, _needs_choices, _overlaps_for
 
-from . import services
+from . import jobs, services
 from .extraction import extraction_status
-from .models import ReceiptDocument, ReceiptDraft
+from .models import ExtractionJob, ReceiptDocument, ReceiptDraft
 
 
 class ReceiptUploadForm(forms.Form):
@@ -41,8 +41,9 @@ def receipt_new(request):
         else:
             form.errors.clear()
             form.add_error("receipt", "Choose a photo or PDF of the receipt.")
-    available, message = extraction_status()
-    return render(request, "receipts/new.html", {"form": form, "extraction_available": available, "extraction_message": message})
+    available, message, provider_note = extraction_status()
+    return render(request, "receipts/new.html", {"form": form, "extraction_available": available,
+                                                 "extraction_message": message, "provider_note": provider_note})
 
 
 def _draft_initial(draft):
@@ -55,15 +56,17 @@ def _draft_initial(draft):
 
 
 def _review_context(request, draft, editor, **extra):
-    available, message = extraction_status()
+    available, message, provider_note = extraction_status()
+    job = jobs.latest_job(draft)
     recent = Purchase.objects.for_owner(request.user).filter(
         kind=Purchase.Kind.PURCHASE, status=Purchase.Status.CONFIRMED
     ).order_by("-transaction_date", "-created_at")[:30]
     context = _editor_context(
         request, editor, draft=draft, document=draft.document,
         duplicates=services.duplicate_documents(draft.document).select_related("draft")[:5],
-        extraction_available=available, extraction_message=message, recent_purchases=recent,
-        version=draft.version,
+        extraction_available=available, extraction_message=message, provider_note=provider_note,
+        recent_purchases=recent, version=draft.version,
+        job=job, job_state=jobs.job_state(job), extraction=(draft.data or {}).get("extraction") or {},
     )
     context.update(extra)
     return context
@@ -112,6 +115,17 @@ def receipt_confirm(request, uuid):
     overlaps = _overlaps_for(request, editor)
     if overlaps and _needs_choices(overlaps):
         return render(request, "receipts/review.html", _review_context(request, draft, editor, overlaps=overlaps))
+    extraction = (draft.data or {}).get("extraction") or {}
+    if extraction.get("gbp_confirmation_required") and request.POST.get("gbp_confirmed") != "1":
+        editor.errors = ["Confirm that every amount you entered is in pounds sterling (GBP)."]
+        return render(request, "receipts/review.html", _review_context(request, draft, editor, overlaps=overlaps))
+    similar = services.find_similar_purchases(owner, editor.purchase_input, draft.document)
+    acknowledged = set(request.POST.getlist("ack_duplicate"))
+    if any(str(p.uuid) not in acknowledged for p, _ in similar):
+        editor.errors = ["This may duplicate a purchase you already recorded. Check the list below, then either "
+                         "attach the receipt to that purchase or confirm it is a separate purchase."]
+        return render(request, "receipts/review.html", _review_context(
+            request, draft, editor, overlaps=overlaps, similar_purchases=similar, acknowledged=acknowledged))
     try:
         purchase = services.confirm_receipt(owner, draft, editor.purchase_input, request.POST.get("version"),
                                             editor.balance_choices)
@@ -179,3 +193,44 @@ def receipt_file(request, uuid):
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+@require_POST
+def receipt_read(request, uuid):
+    """Explicit user action: queue this receipt for automatic reading."""
+    draft = owned(ReceiptDraft, request.user, uuid=uuid)
+    try:
+        jobs.request_reading(request.user, draft, request.POST.get("version"))
+    except (BusinessRuleError, StaleObjectError) as exc:
+        flash_errors(request, exc)
+    else:
+        messages.info(request, "Reading queued. You can keep editing; nothing is recorded until you confirm.")
+    return redirect("receipts:review", uuid=uuid)
+
+
+def receipt_reading_status(request, uuid):
+    """Polling endpoint: job status only. It never returns or changes form values."""
+    draft = owned(ReceiptDraft, request.user, uuid=uuid)
+    state = jobs.job_state(jobs.latest_job(draft))
+    state["draft_version"] = draft.version
+    response = JsonResponse(state)
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+@require_POST
+def receipt_apply_reading(request, uuid):
+    """Explicitly replace the draft's current values with a held (late) reading."""
+    draft = owned(ReceiptDraft, request.user, uuid=uuid)
+    job_id = request.POST.get("job", "")
+    job = ExtractionJob.objects.for_owner(request.user).filter(draft=draft, pk=int(job_id)).first() \
+        if job_id.isdigit() else None
+    if job is None:
+        raise Http404
+    try:
+        jobs.apply_held_result(request.user, job, request.POST.get("version"))
+    except (BusinessRuleError, StaleObjectError) as exc:
+        flash_errors(request, exc)
+    else:
+        messages.success(request, "The reading replaced the draft values. Check every value before confirming.")
+    return redirect("receipts:review", uuid=uuid)

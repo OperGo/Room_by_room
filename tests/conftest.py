@@ -15,6 +15,13 @@ D = Decimal
 @pytest.fixture(autouse=True)
 def private_storage_tmp(settings, tmp_path):
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+    # Never call a paid provider from tests, whatever the environment says.
+    settings.ANTHROPIC_API_KEY = ""
+    settings.RECEIPT_EXTRACTOR = "anthropic"
+    from apps.receipts.extraction import FakeExtractor
+
+    FakeExtractor.queue.clear()
+    FakeExtractor.calls.clear()
     settings.STORAGES = {
         **settings.STORAGES,
         "private": {"BACKEND": "apps.core.storage.PrivateFileSystemStorage", "OPTIONS": {"location": tmp_path / "private"}},

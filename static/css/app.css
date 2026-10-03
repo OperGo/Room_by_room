@@ -584,3 +584,4 @@ details.line-more > summary, details.disclosure > summary { min-height: var(--ta
 .dup-check .check, .gbp-check .check { align-items: flex-start; }
 @media (min-width: 768px) { .reading-offer { grid-template-columns: auto 1fr; align-items: center; column-gap: 14px; } .reading-offer .btn { width: auto; } }
 .unsaved-note { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--ochre-tint); color: #6B4C0E; }
+.spinner[hidden] { display: none; }

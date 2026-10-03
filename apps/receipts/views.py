@@ -95,12 +95,14 @@ def receipt_save(request, uuid):
     editor.is_valid()  # parse for redisplay; drafts may be incomplete
     try:
         services.save_draft(request.user, draft, request.POST.get("version"), _editor_snapshot(editor))
-    except StaleObjectError:
+    except StaleObjectError as exc:
         # Recoverable conflict: keep every submitted value (header, lines, splits, flags),
         # show the current version, and let the owner save again deliberately.
         draft.refresh_from_db()
         editor.errors = []
-        context = _review_context(request, draft, editor, save_conflict=True)
+        missing = request.POST.get("version", "").strip() == "" or not request.POST.get("version", "").isdigit()
+        context = _review_context(request, draft, editor, save_conflict=True,
+                                  save_conflict_reason=exc.messages[0] if missing else "")
         return render(request, "receipts/review.html", context, status=409)
     except BusinessRuleError as exc:
         flash_errors(request, exc)

@@ -259,6 +259,11 @@ class FakeExtractor(ReceiptExtractor):
 
     def extract(self, document):
         FakeExtractor.calls.append(document.pk)
+        delay = float(getattr(settings, "RECEIPT_FAKE_DELAY_SECONDS", 0) or 0)
+        if delay:  # rehearsal only: simulates provider latency without any network call
+            import time
+
+            time.sleep(min(delay, 30))
         item = FakeExtractor.queue.popleft() if FakeExtractor.queue else SAMPLE_RESULT
         if isinstance(item, Exception):
             raise item

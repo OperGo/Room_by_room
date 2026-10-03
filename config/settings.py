@@ -33,6 +33,11 @@ if not SECRET_KEY:
 
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
+# Render sets RENDER_EXTERNAL_HOSTNAME (e.g. room-by-room.onrender.com) on web services.
+RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
 
 INSTALLED_APPS = [
     "django.contrib.auth",
@@ -51,6 +56,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # static files only; private files never live there
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -133,11 +139,18 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 PRIVATE_STORAGE_ROOT = Path(os.environ.get("PRIVATE_STORAGE_ROOT", BASE_DIR / "private_storage"))
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "private": {
-        "BACKEND": "apps.core.storage.PrivateFileSystemStorage",
-        "OPTIONS": {"location": PRIVATE_STORAGE_ROOT},
+    # "filesystem" for local development; "database" on Render, where the web service and the
+    # worker are separate machines and a persistent disk cannot be shared between them.
+    "private": (
+        {"BACKEND": "apps.core.storage.DatabaseStorage"}
+        if os.environ.get("PRIVATE_STORAGE_BACKEND", "filesystem") == "database"
+        else {"BACKEND": "apps.core.storage.PrivateFileSystemStorage", "OPTIONS": {"location": PRIVATE_STORAGE_ROOT}}
+    ),
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        if env_bool("STATIC_MANIFEST", False)
+        else "django.contrib.staticfiles.storage.StaticFilesStorage"
     },
-    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 
 # Upload limits (see docs/receipt-processing.md).
@@ -159,7 +172,8 @@ RECEIPT_MAX_ATTEMPTS = 2
 RECEIPT_RETRY_DELAY_SECONDS = int(os.environ.get("RECEIPT_RETRY_DELAY_SECONDS", "30"))
 RECEIPT_MAX_OUTPUT_TOKENS = 8192
 RECEIPT_IMAGE_LONG_EDGE = 1568  # standard-tier vision limit for claude-haiku-4-5
-RECEIPT_STALE_QUEUE_SECONDS = 120  # UI hint when no worker seems to be running
+RECEIPT_STALE_QUEUE_SECONDS = 120
+RECEIPT_FAKE_DELAY_SECONDS = float(os.environ.get("RECEIPT_FAKE_DELAY_SECONDS", "0"))  # fake extractor only  # UI hint when no worker seems to be running
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -175,6 +189,7 @@ SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "SAMEORIGIN"
 if env_bool("DJANGO_HTTPS", False):
     SECURE_SSL_REDIRECT = True
+    SECURE_REDIRECT_EXEMPT = [r"^healthz/$"]  # Render's internal health check uses plain HTTP
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 

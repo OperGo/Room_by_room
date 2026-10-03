@@ -53,7 +53,10 @@ def save_draft(owner, draft, expected_version, data):
             raise StaleObjectError()
         # Keep extraction metadata (currency, flags) when the owner saves their edits.
         if "extraction" in (locked.data or {}) and "extraction" not in data:
-            data = {**data, "extraction": locked.data["extraction"]}
+            # The values are now the owner's: keep currency/flags, but the reading's
+            # reconciliation no longer describes them.
+            extraction = {**locked.data["extraction"], "edited_by_owner": True, "reconciled": False}
+            data = {**data, "extraction": extraction}
         locked.data = data
         locked.version += 1
         locked.save(update_fields=["data", "version", "updated_at"])

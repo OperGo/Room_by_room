@@ -353,6 +353,8 @@ def test_save_conflict_after_reading_keeps_every_submitted_value(client_owner, o
     assert draft.version == 3 and draft.data["merchant"] == "Typed by owner"
     assert draft.data["lines"][0]["allocations"][1]["amount"] == "5.00"
     assert draft.data["extraction"]["job_id"]  # reading metadata kept with the owner's values
+    assert draft.data["extraction"]["edited_by_owner"] is True and draft.data["extraction"]["reconciled"] is False
     page = client_owner.get(reverse("receipts:review", args=[draft.uuid])).content.decode()
     assert 'value="Typed by owner"' in page and 'value="My glue"' in page
+    assert "then edited by you" in page and "Items match the receipt total" not in page
     assert_no_cost(owner)

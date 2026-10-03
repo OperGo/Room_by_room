@@ -9,7 +9,8 @@
 </header>
 {% if save_conflict %}
 <div class="alert alert-warning" role="alert" id="save-conflict" tabindex="-1">{% icon "triangle-alert" 18 %}<div>
-  <strong>Not saved yet: this draft changed since you opened it</strong>{% if job_state.status == "succeeded" and job_state.result_state == "applied" %} (the automatic reading finished and was stored){% endif %}.
+  {% if save_conflict_reason %}<strong>Not saved yet.</strong> {{ save_conflict_reason }}
+  {% else %}<strong>Not saved yet: this draft changed since you opened it</strong>{% endif %}{% if job_state.status == "succeeded" and job_state.result_state == "applied" %} (the automatic reading finished and was stored){% endif %}.
   Everything you entered is still shown below. Press <strong>Save draft</strong> again to keep your version, or <a href="{% url 'receipts:review' draft.uuid %}">reload the stored draft</a> to discard your changes.
 </div></div>
 {% endif %}

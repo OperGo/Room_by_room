@@ -106,6 +106,11 @@
           }
           if (!formDirty) { window.location.reload(); return; }
           if (label) label.textContent = state.status === "failed" ? "Reading failed." : "Reading finished.";
+          var spinner = panel.querySelector("[data-reading-spinner]");
+          if (spinner) spinner.hidden = true;
+          var progressNote = panel.querySelector("[data-reading-progress-note]");
+          if (progressNote) progressNote.hidden = true;
+          if (attempt) attempt.textContent = "";
           if (done) done.hidden = false;
           if (dirtyNote) dirtyNote.hidden = false;
         })

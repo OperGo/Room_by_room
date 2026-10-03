@@ -148,3 +148,9 @@ def test_csrf_enforced(owner):
     c.force_login(owner)
     response = c.post(reverse("projects:create"), {"title": "No token", "status": "active"})
     assert response.status_code == 403
+
+
+def test_healthz_is_public_and_reveals_nothing(client, owner_records):
+    response = client.get("/healthz/")
+    assert response.status_code == 200 and response.json() == {"status": "ok"}
+    assert b"Private office" not in response.content

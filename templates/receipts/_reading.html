@@ -4,12 +4,12 @@
   <p class="review-note small muted">{{ extraction_message }}</p>
 {% elif job_state.status == "queued" or job_state.status == "processing" %}
   <div class="alert alert-info reading-progress">
-    <span class="spinner" aria-hidden="true"></span>
+    <span class="spinner" aria-hidden="true" data-reading-spinner></span>
     <div><strong data-reading-label>{% if job_state.status == "queued" %}Waiting to read the receipt…{% else %}Reading the receipt…{% endif %}</strong>
       <span class="small" data-reading-attempt>{% if job_state.attempts %}Attempt {{ job_state.attempts }} of {{ job_state.max_attempts }}.{% endif %}</span>
-      <p class="small" style="margin:4px 0 0">You can keep editing or enter the details yourself. Nothing is recorded until you confirm.</p>
+      <p class="small" style="margin:4px 0 0" data-reading-progress-note>You can keep editing or enter the details yourself. Nothing is recorded until you confirm.</p>
       <p class="small" data-reading-stale {% if not job_state.stale_queue %}hidden{% endif %} style="margin:4px 0 0"><strong>Still waiting.</strong> The receipt worker may not be running; enter the details manually or try later.</p>
-      <p class="small" data-reading-done hidden style="margin:4px 0 0"><strong>Reading finished.</strong> Your changes on this page have been kept.
+      <p class="small" data-reading-done hidden style="margin:4px 0 0">Your changes on this page have been kept.
         <span data-reading-dirty hidden>To keep them, press <strong>Save draft</strong> (you'll be asked to confirm because the draft changed). Or <a href="" data-reading-reload>show the stored reading instead (replaces your changes)</a>.</span></p>
     </div>
   </div>
@@ -30,7 +30,7 @@
   </div></div>
 {% elif job_state.status == "succeeded" and extraction.job_id == job.pk %}
   <div class="alert {% if extraction.warnings or extraction.uncertain_fields %}alert-warning{% else %}alert-success{% endif %}">{% icon "check" 18 %}<div>
-    <strong>{% if job.adapter == "fake" %}Synthetic test reading{% else %}Read automatically{% endif %}.</strong> Check every value against the receipt before confirming.
+    <strong>{% if job.adapter == "fake" %}Synthetic test reading{% else %}Read automatically{% endif %}{% if extraction.edited_by_owner %}, then edited by you{% endif %}.</strong> Check every value against the receipt before confirming.
     <span class="small muted">{% if job.model_version %}{{ job.model_version }}{% endif %}{% if job_state.usage.input_tokens %} · {{ job_state.usage.input_tokens }} input / {{ job_state.usage.output_tokens }} output tokens{% endif %} · attempt {{ job_state.attempts }} of {{ job_state.max_attempts }}</span>
     {% if extraction.warnings %}<ul class="small" style="margin:6px 0 0">{% for w in extraction.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
     {% if extraction.tax_notes %}<p class="small" style="margin:6px 0 0">Tax shown on the receipt is already included in the prices ({{ extraction.tax_notes|join:"; " }}); it is not added again.</p>{% endif %}

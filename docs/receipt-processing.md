@@ -9,7 +9,7 @@ allocates and confirms the purchase.
 | Item | Choice | Source |
 |---|---|---|
 | SDK | `anthropic==1.11.0` (official Python SDK, pinned in requirements.txt) | PyPI; SDK `messages.create` accepts `output_config` |
-| Model | `RECEIPT_MODEL=claude-haiku-4-5` (recommended; configurable) | Cheapest current Claude model ($1 / $5 per million input / output tokens) |
+| Model | `RECEIPT_MODEL=claude-haiku-4-5-20251001` (pinned snapshot for reproducible validation; the model returned by the API is stored on each job) | Cheapest current Claude model ($1 / $5 per million input / output tokens) |
 | Structured output | `output_config.format = {type: "json_schema", schema: RECEIPT_SCHEMA}` | https://platform.claude.com/docs/en/build-with-claude/structured-outputs (lists `claude-haiku-4-5-20251001`) |
 | Images | Base64 JPEG, downscaled to 1568 px long edge (standard vision tier), EXIF-rotated; HEIC sent via its JPEG preview | https://platform.claude.com/docs/en/build-with-claude/vision (10 MB per base64 image, 8000×8000 max, standard tier 1568 px) |
 | PDFs | Base64 `document` block | https://platform.claude.com/docs/en/build-with-claude/pdf-support (32 MB per request; 100 pages when context < 1M) |
@@ -73,6 +73,24 @@ python manage.py process_receipts --once --max-jobs 1
   missing items or correct the amounts." No balancing line is ever invented.
 - No items but a total: the owner may click "Use one “Unitemised purchase” line for the total".
 - The system prompt treats receipt text as data and forbids choosing projects or outputting card numbers.
+
+## Malformed output (Sprint 2A)
+
+- Wrong container or member types (e.g. `uncertain_fields: [{}]`, `warnings: 1`, a non-scalar merchant/total)
+  are a schema failure: the job fails permanently as `malformed` after one attempt, usage is kept, the draft
+  is untouched, nothing is logged from the receipt, and the worker moves on to the next job.
+- Item/adjustment rows that are not objects are skipped; rows beyond 100 are dropped. Either makes the reading
+  **incomplete**: it is never marked reconciled, and reconciliation is calculated only from the lines kept.
+- Any unexpected exception in normalisation or finishing a job is contained at the job boundary.
+
+## Editing while reading (Sprint 2A)
+
+- Any change on the page (typing, adding/removing items or adjustments, splits, the unitemised button) marks
+  it as having unsaved changes; polling then never reloads it.
+- If a reading is stored while you edit, **Save draft** returns a conflict (HTTP 409) that keeps everything
+  you entered and shows the current version; pressing **Save draft (keep my version)** saves it deliberately.
+- "Read receipt automatically" and "Try reading again" are blocked while there are unsaved changes ("Save draft
+  first"). If the draft already has saved values, the button warns that the reading will replace them.
 
 ## Duplicates
 

@@ -32,3 +32,19 @@ def record_change(owner, subject, action, before=None, after=None, reason=""):
         after=after or {},
         reason=reason or "",
     )
+
+
+class StoredFile(models.Model):
+    """Private file bytes kept in PostgreSQL (used by DatabaseStorage on Render).
+
+    One durable store shared by the web service and the receipt worker, covered by the
+    same database backups. Never served directly: owner-checked views stream it.
+    """
+
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    size = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name

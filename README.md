@@ -53,6 +53,6 @@ RECEIPT_EXTRACTOR=fake python scripts/screenshots_sprint2.py --password <demo pa
 
 ## Deployment
 
-Not configured. Real hosting needs HTTPS (`DJANGO_HTTPS=1`), PostgreSQL, a private file store,
+Prepared for Render but **not deployed**: see `render.yaml` and `docs/deployment-render.md`. Real hosting needs HTTPS (`DJANGO_HTTPS=1`), PostgreSQL, a private file store,
 and tested backups/restoration of both database and private files. This repository is a local build,
 not a production deployment.

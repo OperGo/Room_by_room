@@ -1,0 +1,67 @@
+# Render Blueprint for Room by Room — PREPARED FOR REVIEW, NOT APPLIED.
+# Target: the founder's existing Render project "Room by Room". Applying this creates paid
+# resources (≈ US$20/month, see docs/deployment-render.md); do it only after CTO/founder approval.
+
+envVarGroups:
+  - name: room-by-room-shared
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.14"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_HTTPS
+        value: "1"
+      - key: DJANGO_SECURE_COOKIES
+        value: "1"
+      - key: PRIVATE_STORAGE_BACKEND
+        value: database
+      - key: STATIC_MANIFEST
+        value: "1"
+      - key: RECEIPT_EXTRACTOR
+        value: anthropic
+      - key: RECEIPT_MODEL
+        value: claude-haiku-4-5-20251001
+      - key: ANTHROPIC_API_KEY
+        sync: false          # entered privately in the Render dashboard; never committed
+
+services:
+  - type: web
+    name: room-by-room-web
+    runtime: python
+    plan: starter
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    preDeployCommand: python manage.py migrate --noinput
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    healthCheckPath: /healthz/
+    envVars:
+      - fromGroup: room-by-room-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: room-by-room-db
+          property: connectionString
+
+  - type: worker
+    name: room-by-room-receipts
+    runtime: python
+    plan: starter
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py process_receipts --watch --interval 3
+    maxShutdownDelaySeconds: 90   # lets an in-flight reading (60 s timeout) finish after SIGTERM
+    envVars:
+      - fromGroup: room-by-room-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: room-by-room-db
+          property: connectionString
+
+databases:
+  - name: room-by-room-db
+    plan: basic-256mb
+    region: frankfurt
+    databaseName: roombyroom
+    user: roombyroom
+    ipAllowList: []          # no public access; services connect over Render's private network

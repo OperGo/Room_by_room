@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_not_required
 from django.db.models import F, Max
+from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.templatetags.static import static
@@ -53,3 +54,17 @@ def manifest(request):
         "theme_color": "#23483C",
         "icons": [{"src": static("img/icon-512.png"), "sizes": "512x512", "type": "image/png"}],
     }, content_type="application/manifest+json")
+
+
+@login_not_required
+def healthz(request):
+    """Liveness/readiness for Render: database reachable. Returns no user data."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except Exception:  # noqa: BLE001
+        return JsonResponse({"status": "unavailable"}, status=503)
+    response = JsonResponse({"status": "ok"})
+    response["Cache-Control"] = "no-store"
+    return response

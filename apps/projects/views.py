@@ -77,9 +77,10 @@ def project_detail(request, uuid):
     tasks = list(project.tasks.prefetch_related("prerequisite_links__prerequisite"))
     for task in tasks:
         prereqs = [link.prerequisite for link in task.prerequisite_links.all()]
-        task.waiting_on = [p for p in prereqs if p.is_open]
+        task.waiting_on = [p for p in prereqs if p.status != Task.Status.DONE]
         task.done_before_prereq = task.status == Task.Status.DONE and bool(task.waiting_on)
-    open_tasks = [t for t in tasks if t.is_open]
+    # Actionable jobs first; blocked jobs stay visible after them.
+    open_tasks = sorted((t for t in tasks if t.is_open), key=lambda t: bool(t.waiting_on))
     done_tasks = [t for t in tasks if t.status == Task.Status.DONE]
     cancelled_tasks = [t for t in tasks if t.status == Task.Status.CANCELLED]
     summary = project_cost_summary(project)

@@ -104,8 +104,9 @@ def test_duplicate_checksum_warns(client_owner, owner):
     assert ReceiptDocument.objects.count() == 2  # warning, not a block
 
 
-def confirm_payload(project, total="76.50"):
+def confirm_payload(project, total="76.50", version=1):
     return {
+        "version": str(version),
         "description": "Timber merchant", "merchant": "Timber Co", "transaction_date": "2026-09-12", "total": total,
         "line-0-description": "MDF", "line-0-amount": "32.00", "line-0-alloc-0-dest": f"project:{project.uuid}",
         "line-1-description": "Primer", "line-1-amount": "35.00", "line-1-alloc-0-dest": f"project:{project.uuid}",
@@ -138,7 +139,7 @@ def test_unreconciled_draft_is_not_posted(client_owner, owner, office):
     draft = ReceiptDraft.objects.get()
     response = client_owner.post(reverse("receipts:confirm", args=[draft.uuid]), confirm_payload(office, total="80.00"))
     assert response.status_code == 200
-    assert b"Nothing was recorded" in response.content and b"Lines add up to" in response.content
+    assert b"Nothing was recorded" in response.content and b"Items add up to" in response.content
     assert Purchase.objects.count() == 0
 
 
@@ -166,8 +167,8 @@ def test_attach_to_existing_purchase_adds_no_cost(client_owner, owner, office):
     purchase = post_purchase(owner, purchase_input([line("MDF", "32.00", [to(office, "32.00")])]))
     post_receipt(client_owner, "r.jpg", image_bytes())
     draft = ReceiptDraft.objects.get()
-    client_owner.post(reverse("receipts:attach", args=[draft.uuid]), {"purchase": str(purchase.uuid)})
-    client_owner.post(reverse("receipts:attach", args=[draft.uuid]), {"purchase": str(purchase.uuid)})
+    client_owner.post(reverse("receipts:attach", args=[draft.uuid]), {"purchase": str(purchase.uuid), "version": "1"})
+    client_owner.post(reverse("receipts:attach", args=[draft.uuid]), {"purchase": str(purchase.uuid), "version": "1"})
     assert Purchase.objects.count() == 1
     assert overall_summary(owner).total == Decimal("32.00")
     assert PurchaseEvidence.objects.filter(purchase=purchase).count() == 1
@@ -198,7 +199,7 @@ def test_attach_rejects_garbage_and_foreign_purchase(client_owner, owner, intrud
 def test_discard_draft(client_owner, owner):
     post_receipt(client_owner, "r.jpg", image_bytes())
     draft = ReceiptDraft.objects.get()
-    client_owner.post(reverse("receipts:discard", args=[draft.uuid]))
+    client_owner.post(reverse("receipts:discard", args=[draft.uuid]), {"version": "1"})
     draft.refresh_from_db()
     assert draft.review_status == "discarded"
     assert ReceiptDocument.objects.count() == 1
@@ -223,3 +224,91 @@ def test_receipt_page_offers_camera_upload_and_manual(client_owner):
     assert 'capture="environment"' in body
     assert 'accept="application/pdf"' in body
     assert reverse("costs:purchase_create") in body
+
+
+# ------------------------------------------------------------------ Sprint 1A: stale draft regression
+
+
+def _draft(client_owner):
+    post_receipt(client_owner, "r.jpg", image_bytes())
+    return ReceiptDraft.objects.get()
+
+
+def test_stale_confirm_after_save_elsewhere_creates_no_cost(client_owner, owner, office):
+    draft = _draft(client_owner)
+    assert draft.version == 1
+    # Another tab saves the draft (version 1 -> 2).
+    saved = confirm_payload(office, total="76.50", version=1)
+    client_owner.post(reverse("receipts:save", args=[draft.uuid]), saved)
+    draft.refresh_from_db()
+    assert draft.version == 2
+    # The first tab now confirms with version 1.
+    payload = confirm_payload(office, version=1)
+    payload["merchant"] = "Typed in the stale tab"
+    response = client_owner.post(reverse("receipts:confirm", args=[draft.uuid]), payload)
+    assert response.status_code == 409
+    assert b"changed elsewhere since you opened it" in response.content
+    assert b'value="Typed in the stale tab"' in response.content  # entries retained
+    assert b'name="version" value="2"' in response.content
+    assert Purchase.objects.count() == 0
+    assert overall_summary(owner).total == Decimal("0.00")
+    # A deliberate confirm with the current version then works exactly once.
+    ok = client_owner.post(reverse("receipts:confirm", args=[draft.uuid]), confirm_payload(office, version=2))
+    again = client_owner.post(reverse("receipts:confirm", args=[draft.uuid]), confirm_payload(office, version=2))
+    stale_retry = client_owner.post(reverse("receipts:confirm", args=[draft.uuid]), confirm_payload(office, version=1))
+    assert ok.status_code == again.status_code == stale_retry.status_code == 302
+    assert ok["Location"] == again["Location"] == stale_retry["Location"]
+    assert Purchase.objects.count() == 1
+
+
+@pytest.mark.parametrize("version", [None, "", "abc", "0", "-1", "1.5"])
+def test_confirm_with_missing_or_malformed_version_fails_cleanly(client_owner, owner, office, version):
+    draft = _draft(client_owner)
+    payload = confirm_payload(office)
+    if version is None:
+        payload.pop("version")
+    else:
+        payload["version"] = version
+    response = client_owner.post(reverse("receipts:confirm", args=[draft.uuid]), payload)
+    assert response.status_code == 409
+    assert b"Nothing was recorded" in response.content
+    assert Purchase.objects.count() == 0
+
+
+def test_confirm_service_checks_version_under_lock(owner, office):
+    from apps.core.exceptions import StaleObjectError
+    from apps.receipts.models import ReceiptDocument
+    from apps.receipts.services import confirm_receipt
+
+    from .conftest import line, purchase_input, to
+
+    document = ReceiptDocument.objects.create(owner=owner, storage_key="k", checksum="c", mime="image/jpeg", size=1)
+    draft = ReceiptDraft.objects.create(owner=owner, document=document)
+    ReceiptDraft.objects.filter(pk=draft.pk).update(version=3)
+    data = purchase_input([line("MDF", "32.00", [to(office, "32.00")])])
+    with pytest.raises(StaleObjectError):
+        confirm_receipt(owner, draft, data, 2)
+    assert Purchase.objects.count() == 0
+    first = confirm_receipt(owner, draft, data, 3)
+    assert confirm_receipt(owner, draft, data, 1).pk == first.pk  # already confirmed: idempotent
+
+
+@pytest.mark.parametrize("action", ["save", "attach", "discard"])
+def test_stale_save_attach_discard_are_refused(client_owner, owner, office, action):
+    from apps.costs.services import post_purchase
+
+    from .conftest import line, purchase_input, to
+
+    purchase = post_purchase(owner, purchase_input([line("MDF", "32.00", [to(office, "32.00")])]))
+    draft = _draft(client_owner)
+    ReceiptDraft.objects.filter(pk=draft.pk).update(version=2)
+    data = {"version": "1", "purchase": str(purchase.uuid), **confirm_payload(office, version=1)}
+    response = client_owner.post(reverse(f"receipts:{action}", args=[draft.uuid]), data, follow=True)
+    assert b"changed since you opened it" in response.content
+    draft.refresh_from_db()
+    assert draft.review_status == "draft" and draft.version == 2
+    assert not PurchaseEvidence.objects.exists()
+    malformed = client_owner.post(reverse(f"receipts:{action}", args=[draft.uuid]), {**data, "version": "x"}, follow=True)
+    assert b"missing its version" in malformed.content
+    draft.refresh_from_db()
+    assert draft.review_status == "draft"

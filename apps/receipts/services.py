@@ -3,7 +3,7 @@ import uuid
 from django.core.files.base import ContentFile
 from django.db import transaction
 
-from apps.core.exceptions import BusinessRuleError, StaleObjectError
+from apps.core.exceptions import BusinessRuleError, StaleObjectError, parse_version
 from apps.core.models import record_change
 from apps.core.storage import private_storage
 from apps.core.uploads import MIME_HEIC, normalised_jpeg
@@ -47,22 +47,26 @@ def duplicate_documents(document):
 def save_draft(owner, draft, expected_version, data):
     with transaction.atomic():
         locked = ReceiptDraft.objects.select_for_update().get(pk=draft.pk, owner=owner)
-        if expected_version is not None and int(expected_version) != locked.version:
-            raise StaleObjectError()
         if not locked.is_open:
             raise BusinessRuleError("This receipt has already been handled.")
+        if parse_version(expected_version) != locked.version:
+            raise StaleObjectError()
         locked.data = data
         locked.version += 1
         locked.save(update_fields=["data", "version", "updated_at"])
         return locked
 
 
-def confirm_receipt(owner, draft, purchase_input, balance_choices=None):
-    """Post exactly one purchase for this draft (idempotent on retries and double taps)."""
-    return post_purchase(owner, purchase_input, source_draft=draft, balance_choices=balance_choices)
+def confirm_receipt(owner, draft, purchase_input, expected_version, balance_choices=None):
+    """Post exactly one purchase for this draft (idempotent on retries and double taps).
+
+    The draft version is checked under the draft row lock inside the posting transaction.
+    """
+    return post_purchase(owner, purchase_input, source_draft=draft, balance_choices=balance_choices,
+                         draft_version=expected_version)
 
 
-def attach_to_purchase(owner, draft, purchase):
+def attach_to_purchase(owner, draft, purchase, expected_version):
     """Attach the receipt as evidence for an existing purchase. Adds no cost."""
     with transaction.atomic():
         locked = ReceiptDraft.objects.select_for_update().get(pk=draft.pk, owner=owner)
@@ -70,6 +74,8 @@ def attach_to_purchase(owner, draft, purchase):
             return locked
         if not locked.is_open:
             raise BusinessRuleError("This receipt has already been handled.")
+        if parse_version(expected_version) != locked.version:
+            raise StaleObjectError()
         target = Purchase.objects.select_for_update().get(pk=purchase.pk, owner=owner)
         PurchaseEvidence.objects.get_or_create(purchase=target, document=locked.document)
         locked.review_status = ReceiptDraft.ReviewStatus.ATTACHED
@@ -80,11 +86,13 @@ def attach_to_purchase(owner, draft, purchase):
         return locked
 
 
-def discard_draft(owner, draft):
+def discard_draft(owner, draft, expected_version):
     with transaction.atomic():
         locked = ReceiptDraft.objects.select_for_update().get(pk=draft.pk, owner=owner)
         if not locked.is_open:
             raise BusinessRuleError("This receipt has already been handled.")
+        if parse_version(expected_version) != locked.version:
+            raise StaleObjectError()
         locked.review_status = ReceiptDraft.ReviewStatus.DISCARDED
         locked.version += 1
         locked.save(update_fields=["review_status", "version", "updated_at"])

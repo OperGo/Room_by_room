@@ -545,3 +545,28 @@ details.line-more[open] > summary .icon { transform: rotate(180deg); }
   .mobile-head .wordmark { display: none; }
   .mobile-head { justify-content: flex-end; min-height: 0; margin-bottom: 0; }
 }
+
+/* ================================================================== Sprint 1A corrections */
+html { scroll-padding-top: 16px; scroll-padding-bottom: calc(var(--nav-h) + 96px); }
+body.is-typing .sticky-cta { position: static; }
+body.is-typing .sticky-cta::before { display: none; }
+@media (max-width: 1023.98px) { body.is-typing .bottom-nav { display: none; } }
+.btn-sm { min-height: var(--tap); }
+details.line-more > summary, details.disclosure > summary { min-height: var(--tap); }
+.alloc-bar.good .alloc-status { color: var(--primary); }
+.line-card .editor-grid { grid-template-columns: 1fr 1fr; }
+.line-card .editor-grid .wide { grid-column: 1 / -1; }
+.demo-tag { display: inline-block; margin: 0 0 8px; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--ochre); background: var(--ochre-tint); }
+.project-cover .hero-photo { aspect-ratio: 16 / 6.6; }
+.page-head .meta { margin-bottom: 10px; }
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .review-grid { grid-template-columns: 34% 1fr; }
+}
+.review-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 10px 0 0; }
+.review-status .small { flex: 1 1 200px; }
+.ev-thumb img { max-height: 260px; }
+@media (max-width: 599.98px) {
+  .alloc-row:not(.single) { grid-template-columns: 1fr var(--tap); }
+  .alloc-row:not(.single) .dest-wrap { grid-column: 1 / -1; }
+}
+.group-bar { min-height: var(--tap); }

@@ -51,7 +51,7 @@ def test_brief_example_arithmetic(owner, office, hallway):
 def test_total_must_reconcile_with_lines(owner, office):
     with pytest.raises(BusinessRuleError) as exc:
         services.post_purchase(owner, purchase_input([line("MDF", "32.00", [to(office, "32.00")])], total="40.00"))
-    assert "Lines add up to £32.00" in str(exc.value)
+    assert "Items add up to £32.00" in str(exc.value)
     assert Purchase.objects.count() == 0
 
 

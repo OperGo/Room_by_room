@@ -99,12 +99,31 @@ def test_completion_requires_prerequisites_or_override(owner):
     assert ChangeEvent.objects.filter(subject_id=str(prime.uuid), action="completed").exists()
 
 
-def test_cancelled_prerequisite_does_not_block(owner):
+def test_cancelled_prerequisite_still_blocks_until_removed_or_overridden(owner):
     project = Project.objects.create(owner=owner, title="Office")
     a, b = make_task(owner, project, "a"), make_task(owner, project, "b")
     services.set_dependencies(owner, b, [a])
     services.set_task_status(owner, a, "cancelled")
-    services.complete_task(owner, b)
+    assert b.is_blocked
+    assert b not in services.ready_tasks(owner)
+    with pytest.raises(BusinessRuleError) as exc:
+        services.complete_task(owner, b)
+    assert "a (cancelled)" in str(exc.value)
+    # Override with a recorded note.
+    services.complete_task(owner, b, override_note="Prerequisite no longer needed")
+    event = ChangeEvent.objects.get(subject_id=str(b.uuid), action="completed")
+    assert event.after["override_prerequisites"] == ["a (cancelled)"]
+    assert event.reason == "Prerequisite no longer needed"
+    # Or remove the dependency: the task becomes ready.
+    c = make_task(owner, project, "c")
+    services.set_dependencies(owner, c, [a])
+    assert c not in services.ready_tasks(owner)
+    services.set_dependencies(owner, c, [])
+    assert c in services.ready_tasks(owner)
+    # Completion history is preserved when dependencies change.
+    services.set_dependencies(owner, b, [])
+    b.refresh_from_db()
+    assert b.status == "done" and b.completion_override_note == "Prerequisite no longer needed"
 
 
 def test_changing_dependencies_keeps_completion_history(owner):

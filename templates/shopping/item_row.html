@@ -12,6 +12,7 @@
       {% if not item.is_bought %}<span>{{ item.quantity|floatformat:"-2" }}{% if item.unit %} {{ item.unit }}{% endif %}</span>{% endif %}
       {% if item.is_bought or group_by == "retailer" %}{% if item.project %}<span class="dot-sep">{{ item.project.room|default:item.project.title }}</span>{% endif %}{% endif %}
       {% if item.task and not item.is_bought %}<span class="dot-sep">{{ item.task.title }}</span>{% endif %}
+      {% if group_by == "project" and item.retailer and not item.is_bought %}<span class="dot-sep">{{ item.retailer }}</span>{% endif %}
     {% endspaceless %}{% if item.purchase_line_id %} <span class="badge badge-done">Purchase recorded</span>{% endif %}</span>
   </a>
   {% if item.purchase_line_id %}

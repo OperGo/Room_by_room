@@ -113,10 +113,16 @@ def receipt_confirm(request, uuid):
     if overlaps and _needs_choices(overlaps):
         return render(request, "receipts/review.html", _review_context(request, draft, editor, overlaps=overlaps))
     try:
-        purchase = services.confirm_receipt(owner, draft, editor.purchase_input, editor.balance_choices)
-    except BusinessRuleError as exc:
+        purchase = services.confirm_receipt(owner, draft, editor.purchase_input, request.POST.get("version"),
+                                            editor.balance_choices)
+    except (BusinessRuleError, StaleObjectError) as exc:
         editor.errors = exc.messages
-        return render(request, "receipts/review.html", _review_context(request, draft, editor, overlaps=overlaps))
+        draft.refresh_from_db()
+        context = _review_context(request, draft, editor, overlaps=overlaps)
+        if isinstance(exc, StaleObjectError):
+            # Keep the user's entries; the refreshed version lets them confirm deliberately.
+            context["stale"] = True
+        return render(request, "receipts/review.html", context, status=409 if isinstance(exc, StaleObjectError) else 200)
     messages.success(request, "Receipt confirmed and purchase recorded.")
     return redirect("costs:purchase_detail", uuid=purchase.uuid)
 
@@ -133,8 +139,8 @@ def receipt_attach(request, uuid):
         messages.error(request, "Choose the purchase this receipt belongs to.")
         return redirect("receipts:review", uuid=uuid)
     try:
-        services.attach_to_purchase(request.user, draft, purchase)
-    except BusinessRuleError as exc:
+        services.attach_to_purchase(request.user, draft, purchase, request.POST.get("version"))
+    except (BusinessRuleError, StaleObjectError) as exc:
         flash_errors(request, exc)
         return redirect("receipts:review", uuid=uuid)
     messages.success(request, "Receipt attached as evidence. No new cost was recorded.")
@@ -145,8 +151,8 @@ def receipt_attach(request, uuid):
 def receipt_discard(request, uuid):
     draft = owned(ReceiptDraft, request.user, uuid=uuid)
     try:
-        services.discard_draft(request.user, draft)
-    except BusinessRuleError as exc:
+        services.discard_draft(request.user, draft, request.POST.get("version"))
+    except (BusinessRuleError, StaleObjectError) as exc:
         flash_errors(request, exc)
         return redirect("receipts:review", uuid=uuid)
     if request.GET.get("retake"):

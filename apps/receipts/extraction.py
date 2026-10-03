@@ -56,9 +56,9 @@ class NotConfiguredExtractor(ReceiptExtractor):
 def extraction_status():
     """Return (available, message) for the UI."""
     if not settings.RECEIPT_EXTRACTION_ENABLED:
-        return False, "Automatic extraction is not available yet (planned for Sprint 2). Enter the details from the receipt below."
+        return False, "Automatic receipt reading is not available yet. Enter the details from the receipt."
     if not settings.ANTHROPIC_API_KEY or not settings.RECEIPT_MODEL:
-        return False, "Automatic extraction not configured. Enter the details from the receipt below."
+        return False, "Automatic extraction not configured. Enter the details from the receipt."
     return True, ""
 
 

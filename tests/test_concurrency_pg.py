@@ -70,7 +70,7 @@ def test_double_confirm_of_one_draft_posts_once(setup):
     draft = ReceiptDraft.objects.create(owner=owner, document=document)
     data = purchase_input([line("MDF", "32.00", [to(office, "32.00")])])
     with mock.patch("apps.costs.services.validate_purchase_input", side_effect=slow_validate):
-        results, errors = run_concurrently(lambda: services.post_purchase(owner, data, source_draft=draft))
+        results, errors = run_concurrently(lambda: services.post_purchase(owner, data, source_draft=draft, draft_version=draft.version))
     assert not errors
     assert len({p.pk for p in results}) == 1
     assert Purchase.objects.count() == 1

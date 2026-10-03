@@ -97,11 +97,15 @@ def complete_task(owner, task, *, override_note="", expected_version=None):
             return locked
         if locked.status == Task.Status.CANCELLED:
             raise BusinessRuleError("Reopen this cancelled task before completing it.")
-        blocking = list(locked.open_prerequisites().values_list("title", flat=True))
+        blocking = [
+            f"{title} (cancelled)" if status == Task.Status.CANCELLED else title
+            for title, status in locked.open_prerequisites().values_list("title", "status")
+        ]
         override_note = (override_note or "").strip()
         if blocking and not override_note:
             raise BusinessRuleError(
-                "Waiting on: " + ", ".join(blocking) + ". Finish those first, or add a note explaining the override."
+                "Waiting on: " + ", ".join(blocking) + ". Finish those first, remove the dependency, "
+                "or add a note explaining the override."
             )
         before = {"status": locked.status}
         locked.status = Task.Status.DONE
@@ -197,7 +201,7 @@ def set_dependencies(owner, task, prerequisites):
 
 
 def ready_tasks(owner):
-    """Open tasks in planned/active projects whose prerequisites are all done or cancelled."""
+    """Open tasks in planned/active projects whose prerequisites are all done."""
     open_statuses = [Task.Status.TODO, Task.Status.IN_PROGRESS]
     return (
         Task.objects.filter(
@@ -205,7 +209,7 @@ def ready_tasks(owner):
             project__status__in=[Project.Status.PLANNED, Project.Status.ACTIVE],
             status__in=open_statuses,
         )
-        .exclude(prerequisite_links__prerequisite__status__in=open_statuses)
+        .exclude(prerequisite_links__prerequisite__status__in=open_statuses + [Task.Status.CANCELLED])
         .select_related("project")
         .order_by("due_date", "project__title", "position")
     )

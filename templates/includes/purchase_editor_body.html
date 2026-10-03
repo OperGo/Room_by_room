@@ -13,7 +13,7 @@
     <div><div class="spend-label">Allocated</div><strong data-alloc-text class="money">—</strong><div class="alloc-status" data-reconcile-status></div></div>
     <span class="ok" aria-hidden="true">{% icon "check" 20 %}</span>
   </div>
-  <p class="help" style="margin:8px 0 0">Prices are the final amounts paid in GBP. No tax is calculated. A blank total uses the item total.</p>
+  <p class="help" id="total-help" style="margin:8px 0 0">Items must add up to the purchase total. Leave the total blank to use the items’ total.</p>
   <details class="line-more" style="margin-top:8px" {% if editor.header.notes %}open{% endif %}>
     <summary>{% icon "chevron-down" 16 %}Description and notes</summary>
     <div class="line-more-body">
@@ -21,6 +21,7 @@
         <input type="text" id="f-description" name="description" value="{{ editor.header.description }}" maxlength="160"></div>
       <div class="field"><label for="f-notes">Notes <span class="muted small">(optional)</span></label>
         <textarea id="f-notes" name="notes" rows="2">{{ editor.header.notes }}</textarea></div>
+      <p class="help" style="margin:0">Enter final prices as shown on the receipt. The app never adds or calculates tax.</p>
     </div>
   </details>
 </div>

@@ -14,3 +14,14 @@ class BusinessRuleError(Exception):
             messages = [messages]
         self.messages = list(messages)
         super().__init__(" ".join(self.messages))
+
+
+def parse_version(value):
+    """Parse a submitted form version. Missing or malformed values are a stale form."""
+    try:
+        version = int(str(value).strip())
+    except (TypeError, ValueError):
+        raise StaleObjectError("This form is missing its version. Reload the page and try again.") from None
+    if version < 1:
+        raise StaleObjectError("This form is missing its version. Reload the page and try again.")
+    return version

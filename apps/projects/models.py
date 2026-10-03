@@ -104,8 +104,9 @@ class Task(models.Model):
         return Task.objects.filter(dependents_links__task=self)
 
     def open_prerequisites(self):
-        # A cancelled prerequisite cannot be done, so it no longer blocks.
-        return self.prerequisites().filter(status__in=[Task.Status.TODO, Task.Status.IN_PROGRESS])
+        """Prerequisites that are not done. Cancelled ones still block (CTO decision, Sprint 1A):
+        remove the dependency or complete with a recorded override note."""
+        return self.prerequisites().exclude(status=Task.Status.DONE)
 
     @property
     def is_blocked(self):

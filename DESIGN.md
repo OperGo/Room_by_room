@@ -95,3 +95,19 @@ Intentional differences:
 - "Retake photo" discards the draft (no cost) and returns to Add receipt.
 - Font is Inter (locally served); the mockups use a similar geometric sans.
 - Desktop layouts are not in the mockups; they follow the responsive rules above.
+
+## Sprint 1A corrections
+- Editor copy: "Purchase total (£, GBP)"; essential guidance only ("Items must add up to the purchase
+  total…"); tax note moved into the Description and notes disclosure; the derived total is shown in the
+  Allocated bar when the total is left blank.
+- Receipt review (phone): compact header (draft badge + one-line extraction note), thumbnail beside
+  Merchant/Date/Total, item cards with amount and project in the main row; type, category, quantity,
+  unit price, split and remove inside "Type, quantity or split". Split rows stack project above amount
+  below 600px.
+- Focused fields: on phones the sticky actions return to normal flow and the bottom nav hides while a
+  field has focus; `scroll-padding-bottom` keeps focused fields clear (browser-tested).
+- Project: no budget bar or explanatory paragraph; status badge only when not active; shorter cover;
+  ready jobs listed before blocked ones.
+- Shopping: retailer shown in the project grouping (the project is shown in the shop grouping).
+- Demo label reduced to a small "Demo · fictional data" tag.
+- All controls on the four key screens measure at least 44×44px (browser-tested).

@@ -8,6 +8,6 @@
     </select>
   </div>
   <label class="visually-hidden" for="l{{ i }}-a{{ j }}-amt">Split amount</label>
-  <input class="alloc-amount" type="text" inputmode="decimal" id="l{{ i }}-a{{ j }}-amt" name="line-{{ i }}-alloc-{{ j }}-amount" value="{{ a.amount|default:'' }}" placeholder="£" data-alloc-amount>
+  <input class="alloc-amount" type="text" inputmode="decimal" id="l{{ i }}-a{{ j }}-amt" name="line-{{ i }}-alloc-{{ j }}-amount" value="{{ a.amount|default:'' }}" placeholder="Amount £" data-alloc-amount>
   <button type="button" class="icon-btn alloc-remove" data-remove-alloc aria-label="Remove split">{% icon "x" 16 %}</button>
 </div>

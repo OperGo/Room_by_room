@@ -32,7 +32,7 @@
   </nav>
   {% endif %}
   <main class="main" id="content">
-    {% if user.is_demo %}<p style="margin:0 0 12px"><span class="badge badge-warning">Demo account · fictional sample data</span></p>{% endif %}
+    {% if user.is_demo %}<p class="demo-tag">Demo · fictional data</p>{% endif %}
     {% if messages %}
     <div class="messages" role="status" aria-live="polite">
       {% for message in messages %}

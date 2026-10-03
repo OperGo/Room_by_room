@@ -32,6 +32,21 @@
     }
   });
 
+  // On phones, let the on-screen keyboard and the focused field own the screen:
+  // sticky actions return to normal flow while a field is focused.
+  var narrow = window.matchMedia("(max-width: 1023.98px)");
+  document.addEventListener("focusin", function (event) {
+    if (narrow.matches && event.target.matches("input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea")) {
+      document.body.classList.add("is-typing");
+    }
+  });
+  document.addEventListener("focusout", function () {
+    window.setTimeout(function () {
+      var active = document.activeElement;
+      if (!active || !active.matches("input, select, textarea")) document.body.classList.remove("is-typing");
+    }, 0);
+  });
+
   // Receipt upload: submit as soon as a file is chosen.
   document.querySelectorAll("[data-auto-submit]").forEach(function (input) {
     input.addEventListener("change", function () {
@@ -116,6 +131,9 @@
         box.classList.add("bad");
       } else if (allocated !== target || unassigned) {
         status.textContent = "Choose a project for every item"; box.classList.add("bad");
+      } else if (total === null) {
+        status.textContent = "Purchase total " + formatPence(target) + ", calculated from the items";
+        box.classList.add("good");
       } else {
         status.textContent = "Matches total"; status.classList.add("visually-hidden"); box.classList.add("good");
       }

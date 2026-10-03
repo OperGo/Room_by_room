@@ -128,3 +128,71 @@ def test_phone_layout_without_horizontal_scroll(phone, live_server, owner):
     for path in ("/", "/projects/", "/shopping/", "/costs/", "/receipts/new/", "/costs/purchases/new/"):
         page.goto(f"{live_server.url}{path}")
         assert no_horizontal_scroll(page), path
+
+
+TARGETS = ("a.btn, button.btn, .icon-btn, .task-check, .shop-check, nav.bottom-nav a, .seg-full a, .tabs a, "
+           "input:not([type=hidden]):not([type=file]), select, textarea, .back-link, details > summary, .text-btn")
+
+
+def _small_targets(page):
+    return page.evaluate("""(sel) => [...document.querySelectorAll(sel)].filter(el => {
+        const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+        if (!r.width || !r.height || s.visibility === 'hidden' || el.closest('template')) return false;
+        return r.height < 44 || (r.width < 44 && !el.matches('input, select, textarea'));
+    }).map(el => el.outerHTML.slice(0, 90))""", TARGETS)
+
+
+def _seed_review(owner):
+    from apps.core.uploads import validate_receipt
+    from apps.projects import services as ps
+    from apps.projects.models import Task
+    from apps.receipts.services import store_receipt
+    from apps.shopping.models import ShoppingItem
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    project = Project.objects.create(owner=owner, title="Office", budget=Decimal("100"))
+    ps.save_task(owner, Task(project=project, title="Sand", estimated_minutes=30))
+    ShoppingItem.objects.create(owner=owner, description="Caulk", project=project)
+    from django.utils import timezone
+
+    ShoppingItem.objects.create(owner=owner, description="Dust sheets", purchased_at=timezone.now())
+    buf = io.BytesIO()
+    Image.new("RGB", (300, 500), "white").save(buf, format="JPEG")
+    _, draft = store_receipt(owner, validate_receipt(SimpleUploadedFile("r.jpg", buf.getvalue())), "r.jpg")
+    return project, draft
+
+
+def test_touch_targets_on_key_screens(phone, live_server, owner):
+    project, draft = _seed_review(owner)
+    sign_in(phone, live_server)
+    for path in ("/", f"/projects/{project.uuid}/", "/shopping/", f"/receipts/{draft.uuid}/"):
+        phone.goto(f"{live_server.url}{path}")
+        phone.locator("details").evaluate_all("els => els.forEach(d => d.open = true)")
+        assert _small_targets(phone) == [], path
+
+
+def test_focused_field_not_covered_by_sticky_actions(phone, live_server, owner):
+    project, draft = _seed_review(owner)
+    sign_in(phone, live_server)
+    phone.goto(f"{live_server.url}/receipts/{draft.uuid}/")
+    for selector in ("#f-total", "#l0-amt", "#l0-a0-dest", "#f-merchant"):
+        phone.focus(selector)
+        phone.locator(selector).scroll_into_view_if_needed()
+        covered = phone.evaluate("""(sel) => { const el = document.querySelector(sel); const r = el.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return !(hit === el || el.contains(hit)); }""", selector)
+        assert not covered, selector
+    assert phone.evaluate("document.body.classList.contains('is-typing')")
+    expect(phone.locator("nav.bottom-nav")).to_be_hidden()
+
+
+def test_keyboard_focus_is_visible(desktop, live_server, owner):
+    _seed_review(owner)
+    sign_in(desktop, live_server)
+    desktop.goto(f"{live_server.url}/")
+    desktop.keyboard.press("Tab")  # skip link
+    expect(desktop.locator(".skip-link")).to_be_focused()
+    for _ in range(3):
+        desktop.keyboard.press("Tab")
+    outline = desktop.evaluate("getComputedStyle(document.activeElement).outlineStyle")
+    assert outline != "none"

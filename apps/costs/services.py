@@ -14,7 +14,7 @@ from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from apps.core.exceptions import BusinessRuleError, StaleObjectError
+from apps.core.exceptions import BusinessRuleError, StaleObjectError, parse_version
 from apps.core.models import record_change
 from apps.core.money import ZERO, format_gbp, money_sum
 from apps.projects.models import Project
@@ -129,8 +129,8 @@ def validate_purchase_input(owner, data: PurchaseInput):
         lines_total = money_sum(line.amount for line in data.lines)
         if lines_total != data.total:
             errors.append(
-                f"Lines add up to {format_gbp(lines_total)} but the total is {format_gbp(data.total)}. "
-                "Add a labelled adjustment line (shipping, discount or rounding) or correct the amounts."
+                f"Items add up to {format_gbp(lines_total)} but the purchase total is {format_gbp(data.total)}. "
+                "Add a delivery, discount or rounding item, or correct the amounts."
             )
     if not errors:
         for key, amount in destination_totals_from_input(data).items():
@@ -307,8 +307,14 @@ def purchase_summary(purchase):
     }
 
 
-def post_purchase(owner, data: PurchaseInput, *, submission_key=None, source_draft=None, balance_choices=None):
-    """Create one confirmed purchase. Idempotent per submission key and per receipt draft."""
+def post_purchase(owner, data: PurchaseInput, *, submission_key=None, source_draft=None, balance_choices=None,
+                  draft_version=None):
+    """Create one confirmed purchase. Idempotent per submission key and per receipt draft.
+
+    When posting from a receipt draft, ``draft_version`` must match the locked
+    draft's version, unless the draft was already confirmed (then the existing
+    purchase is returned so retries stay idempotent).
+    """
     try:
         with transaction.atomic():
             if submission_key:
@@ -324,6 +330,11 @@ def post_purchase(owner, data: PurchaseInput, *, submission_key=None, source_dra
                     return existing
                 if draft.review_status != ReceiptDraft.ReviewStatus.DRAFT:
                     raise BusinessRuleError("This receipt has already been handled.")
+                if parse_version(draft_version) != draft.version:
+                    raise StaleObjectError(
+                        "This receipt draft was changed elsewhere since you opened it. "
+                        "Your entries are shown below; review them against the latest draft and confirm again."
+                    )
             errors = validate_purchase_input(owner, data)
             if errors:
                 raise BusinessRuleError(errors)

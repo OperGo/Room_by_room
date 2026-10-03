@@ -41,7 +41,10 @@ unallocated. Drafts and extraction output are never queried.
 - Stale forms: `version` fields checked under row lock → `StaleObjectError` → friendly message.
 - Manual purchase/refund forms carry a `submission_key`; a duplicate submit returns the first record
   (unique constraint + `IntegrityError` recovery).
-- Receipt confirmation locks the draft row; a second confirm returns the existing purchase.
+- Receipt confirmation locks the draft row inside the posting transaction. An already-confirmed draft
+  returns its existing purchase (idempotent retries); otherwise the submitted draft version must match,
+  and missing/malformed/stale versions are refused with nothing posted. Save, attach and discard check
+  the draft version the same way.
 - Verified by PostgreSQL threaded tests in `tests/test_concurrency_pg.py`. SQLite has no row locks.
 
 ## Files
@@ -53,7 +56,6 @@ as uploaded; HEIC receipts also get a JPEG preview. A private object-storage bac
 filesystem class later (with short-lived signed URLs issued only after the owner check).
 
 ## Tasks
-`complete_task` blocks on open prerequisites unless an override note is given; cancelled
-prerequisites do not block. `set_dependencies` rejects self-links, cross-project links and cycles and
-never alters completion history. "Ready" = open task in a planned/active project with no open
-prerequisite. Weekend selection stores the Saturday of the chosen weekend.
+`complete_task` blocks on any prerequisite that is not done — including cancelled ones (CTO decision,
+Sprint 1A) — unless the dependency is removed or an override note is recorded. `set_dependencies` rejects self-links, cross-project links and cycles and
+never alters completion history. "Ready" = open task in a planned/active project whose prerequisites are all done. Weekend selection stores the Saturday of the chosen weekend.

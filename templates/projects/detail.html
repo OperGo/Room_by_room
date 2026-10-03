@@ -7,12 +7,12 @@
     <h1 class="page-title">{{ project.title }}</h1>
     <a class="icon-btn" href="{% url 'projects:edit' project.uuid %}" aria-label="Edit project">{% icon "pencil" 20 %}</a>
   </div>
-  {% if project.status != "active" or project.room %}<p class="small muted" style="margin:2px 0 0">{% if project.room %}{{ project.room }}{% endif %}{% if project.status != "active" %}{% if project.room %} · {% endif %}<span class="badge {% if project.status == 'completed' %}badge-done{% elif project.status == 'archived' %}badge-muted{% else %}badge-outline{% endif %}">{{ project.get_status_display }}</span>{% endif %}</p>{% endif %}
+  {% if project.status != "active" %}<p style="margin:2px 0 0"><span class="badge {% if project.status == 'completed' %}badge-done{% elif project.status == 'archived' %}badge-muted{% else %}badge-outline{% endif %}">{{ project.get_status_display }}</span></p>{% endif %}
   {% include "includes/progress_meta.html" %}
 </header>
 
 <div class="split-2">
-  <div class="card hero-card" style="border-radius:16px">
+  <div class="card hero-card project-cover" style="border-radius:16px">
     <div class="hero-photo">
       {% if project.cover_photo %}
         <img src="{% url 'projects:photo_file' project.cover_photo.uuid %}" alt="{{ project.cover_photo.caption|default:project.title }}">
@@ -30,7 +30,6 @@
       <div><div class="spend-label">Budget</div><div class="spend-value money">{% if summary.budget is not None %}{{ summary.budget|gbp }}{% else %}—{% endif %}</div>
         {% if summary.budget_remaining is not None %}<div class="spend-note {% if summary.over_budget %}over{% endif %}">{% if summary.over_budget %}{{ summary.budget_remaining|gbp }} over{% else %}{{ summary.budget_remaining|gbp }} left{% endif %}</div>{% endif %}</div>
     </div>
-    <p class="tiny muted" style="margin:0">Spent is the cost you have confirmed (purchases and estimates minus refunds), not proof of payment.</p>
   </div>
 </div>
 

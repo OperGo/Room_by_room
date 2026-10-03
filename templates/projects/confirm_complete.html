@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Complete {{ project.title }}{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'projects:detail' project.uuid as back %}{% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><h1>Complete project?</h1></div></header>
+<div class="card card-pad" style="max-width:640px">
+  <div class="alert alert-warning" role="alert">{% icon "triangle-alert" 18 %}<div>{% for m in messages_list %}<p style="margin:0">{{ m }}</p>{% endfor %}</div></div>
+  <ul class="list" style="margin-bottom:16px">{% for t in open_tasks %}<li class="row" style="padding-left:0">{{ t.title }} <span class="badge badge-outline">{{ t.get_status_display }}</span></li>{% endfor %}</ul>
+  <form method="post" action="{% url 'projects:status' project.uuid %}" class="btn-row">{% csrf_token %}
+    <input type="hidden" name="status" value="completed"><input type="hidden" name="version" value="{{ project.version }}">
+    <input type="hidden" name="confirm_unfinished" value="1">
+    <button class="btn" type="submit">Complete with unfinished tasks</button>
+    <a class="btn btn-ghost" href="{{ back }}">Keep working</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Projects{% endblock %}
+{% block content %}
+<header class="topbar">
+  <div class="topbar-title"><h1>Projects</h1></div>
+  <a class="btn btn-sm" href="{% url 'projects:create' %}">{% icon "plus" 18 %}New</a>
+</header>
+<form method="get" class="filters" role="search" style="margin-bottom:18px">
+  <div class="field wide" style="grid-column: span 2"><label class="visually-hidden" for="id_q">Search projects</label>
+    <input type="search" name="q" id="id_q" placeholder="Search title, room or notes" value="{{ form.q.value|default:'' }}"></div>
+  <div class="field"><label class="visually-hidden" for="id_status">Status</label>{{ form.status }}</div>
+  <button class="btn btn-secondary" type="submit">{% icon "search" 18 %}Search</button>
+</form>
+{% for label, projects in groups %}
+<section class="section">
+  <div class="section-head"><h2>{{ label }}</h2><span class="small muted">{{ projects|length }}</span></div>
+  <ul class="list card">
+    {% for p in projects %}
+    <li><a class="row" href="{% url 'projects:detail' p.uuid %}">
+      <span class="thumb">{% if p.cover_photo %}<img src="{% url 'projects:photo_file' p.cover_photo.uuid %}" alt="">{% else %}{% icon "folder-kanban" 22 %}{% endif %}</span>
+      <span class="row-main"><span class="row-title">{{ p.title }}</span>
+        <span class="row-meta">{% if p.room %}{{ p.room }} · {% endif %}{% if p.progress.total %}{{ p.progress.done }} of {{ p.progress.total }} tasks done{% else %}No tasks yet{% endif %}{% if p.completion_date %} · finished {{ p.completion_date|date:"M Y" }}{% elif p.start_date %} · started {{ p.start_date|date:"M Y" }}{% endif %}</span></span>
+      <span class="row-end"><span class="money small">{{ p.net_cost|gbp }}</span>{% if p.budget is not None %}<br><span class="tiny muted">of {{ p.budget|gbp }}</span>{% endif %}</span>
+      <span class="chev">{% icon "chevron-right" 18 %}</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+</section>
+{% empty %}
+<div class="card empty">{% icon "folder-kanban" 32 %}<p>{% if form.q.value or form.status.value %}No projects match.{% else %}No projects yet.{% endif %}</p>
+<a class="btn" href="{% url 'projects:create' %}">{% icon "plus" 18 %}New project</a></div>
+{% endfor %}
+{% endblock %}

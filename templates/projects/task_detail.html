@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}{{ task.title }}{% endblock %}
+{% block content %}
+<header class="topbar">
+  {% url 'projects:detail' project.uuid as back %}{% include "includes/back.html" with href=back label=project.title %}
+  <div class="topbar-title"><p class="eyebrow">{{ project.title }}</p><h1>{{ task.title }}</h1></div>
+  <a class="icon-btn" href="{% url 'projects:task_edit' task.uuid %}" aria-label="Edit task">{% icon "pencil" 20 %}</a>
+</header>
+<div class="split-2">
+  <div class="stack">
+    <div class="card card-pad stack">
+      <div class="btn-row">
+        <span class="badge {% if task.status == 'done' %}badge-done{% elif task.status == 'cancelled' %}badge-muted{% elif waiting_on %}badge-warning{% endif %}">{% if waiting_on and task.is_open %}{% icon "lock" 12 %}Blocked · {% endif %}{{ task.get_status_display }}</span>
+        {% if task.weekend_date == saturday %}<span class="badge">This weekend</span>{% endif %}
+      </div>
+      <dl class="dl">
+        {% if task.estimated_minutes %}<dt>Estimate</dt><dd>{{ task.estimated_minutes|minutes }}</dd>{% endif %}
+        {% if task.due_date %}<dt>Due</dt><dd>{{ task.due_date|date:"j M Y" }}</dd>{% endif %}
+        {% if task.completed_at %}<dt>Completed</dt><dd>{{ task.completed_at|date:"j M Y, H:i" }}</dd>{% endif %}
+      </dl>
+      {% if task.notes %}<p style="white-space:pre-line;margin:0">{{ task.notes }}</p>{% endif %}
+      {% if task.completion_override_note %}<div class="alert alert-info" style="margin:0">{% icon "info" 18 %}<div>Completed before its prerequisites: {{ task.completion_override_note }}</div></div>{% endif %}
+    </div>
+
+    {% if task.is_open %}
+    <div class="card card-pad stack" id="complete">
+      {% if waiting_on %}
+        <div class="alert alert-warning" style="margin:0">{% icon "lock" 18 %}<div>Waiting on {% for p in waiting_on %}<a href="{% url 'projects:task_detail' p.uuid %}">{{ p.title }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}.</div></div>
+        <form method="post" action="{% url 'projects:task_complete' task.uuid %}" class="form">{% csrf_token %}
+          <input type="hidden" name="version" value="{{ task.version }}">
+          <div class="field"><label for="override_note">Complete anyway — explain why</label>
+            <textarea id="override_note" name="override_note" rows="2" required></textarea></div>
+          <div><button class="btn btn-secondary" type="submit">Complete with override</button></div>
+        </form>
+      {% else %}
+        <form method="post" action="{% url 'projects:task_complete' task.uuid %}">{% csrf_token %}
+          <input type="hidden" name="version" value="{{ task.version }}">
+          <button class="btn btn-block" type="submit">{% icon "check" 18 %}Mark done</button></form>
+      {% endif %}
+      <div class="btn-row">
+        {% if task.status == "todo" %}
+        <form method="post" action="{% url 'projects:task_status' task.uuid %}">{% csrf_token %}<input type="hidden" name="status" value="in_progress"><input type="hidden" name="version" value="{{ task.version }}"><button class="btn btn-secondary btn-sm" type="submit">Start</button></form>
+        {% endif %}
+        <form method="post" action="{% url 'projects:task_weekend' task.uuid %}">{% csrf_token %}<button class="btn btn-secondary btn-sm" type="submit">{% icon "calendar" 16 %}{% if task.weekend_date == saturday %}Remove from this weekend{% else %}Plan for this weekend{% endif %}</button></form>
+        <form method="post" action="{% url 'projects:task_status' task.uuid %}">{% csrf_token %}<input type="hidden" name="status" value="cancelled"><input type="hidden" name="version" value="{{ task.version }}"><button class="btn btn-ghost btn-sm" type="submit">Cancel task</button></form>
+      </div>
+    </div>
+    {% else %}
+    <form method="post" action="{% url 'projects:task_status' task.uuid %}">{% csrf_token %}<input type="hidden" name="status" value="todo"><input type="hidden" name="version" value="{{ task.version }}">
+      <button class="btn btn-secondary" type="submit">{% icon "undo-2" 18 %}Reopen task</button></form>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <section class="card card-pad">
+      <div class="section-head"><h2>Dependencies</h2><a href="{% url 'projects:task_dependencies' task.uuid %}">Edit</a></div>
+      {% if prerequisites %}<p class="small muted">Waits for:</p>
+        <ul class="list">{% for p in prerequisites %}<li><a class="row" style="padding-left:0" href="{% url 'projects:task_detail' p.uuid %}"><span class="row-main">{{ p.title }}</span><span class="badge {% if p.status == 'done' %}badge-done{% elif p.status == 'cancelled' %}badge-muted{% else %}badge-warning{% endif %}">{{ p.get_status_display }}</span></a></li>{% endfor %}</ul>
+      {% else %}<p class="small muted" style="margin:0">No prerequisites.</p>{% endif %}
+      {% if dependents %}<p class="small muted" style="margin-top:12px">Needed before:</p>
+        <ul class="list">{% for d in dependents %}<li><a class="row" style="padding-left:0" href="{% url 'projects:task_detail' d.uuid %}"><span class="row-main">{{ d.title }}</span></a></li>{% endfor %}</ul>{% endif %}
+    </section>
+    {% if shopping %}
+    <section class="card card-pad"><h2 style="margin-bottom:8px">Shopping</h2>
+      <ul class="list">{% for i in shopping %}<li class="row" style="padding-left:0"><span class="row-main">{{ i.description }}</span><span class="small muted">{{ i.quantity|floatformat:"-2" }} {{ i.unit }}</span>{% if i.is_bought %}<span class="badge badge-done">Bought</span>{% endif %}</li>{% endfor %}</ul>
+    </section>{% endif %}
+    {% if history %}
+    <section class="card card-pad"><h2 style="margin-bottom:8px">History</h2>
+      <ul class="history">{% for e in history %}<li><strong>{{ e.action|action_label }}</strong> · {{ e.created_at|date:"j M Y H:i" }}{% if e.reason %}<br><span class="muted">{{ e.reason }}</span>{% endif %}</li>{% endfor %}</ul>
+    </section>{% endif %}
+  </div>
+</div>
+{% endblock %}

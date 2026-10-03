@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Review receipt{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'costs:index' as back %}{% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><p class="eyebrow"><span class="badge badge-draft">Draft · not counted</span></p><h1>Review receipt</h1></div></header>
+
+<div class="split-2 receipt-split">
+  <section class="evidence" aria-label="Original receipt">
+    {% if document.is_pdf %}
+      <iframe src="{% url 'receipts:file' document.uuid %}" title="Receipt PDF"></iframe>
+    {% elif document.preview_key %}
+      <img src="{% url 'receipts:file' document.uuid %}?preview=1" alt="Uploaded receipt (converted from HEIC for display)">
+    {% else %}
+      <img src="{% url 'receipts:file' document.uuid %}" alt="Uploaded receipt">
+    {% endif %}
+    <div class="evidence-bar"><span class="muted">{{ document.original_filename|default:"Receipt"|truncatechars:34 }} · {{ document.size|filesizeformat }}{% if document.page_count %} · {{ document.page_count }} page{{ document.page_count|pluralize }}{% endif %}</span>
+      <a href="{% url 'receipts:file' document.uuid %}" target="_blank" rel="noopener">Open original</a></div>
+  </section>
+
+  <div>
+    <div class="alert alert-warning">{% icon "info" 18 %}<div><strong>{% if extraction_available %}Check every value against the receipt.{% else %}{{ extraction_message }}{% endif %}</strong>
+      Nothing is counted until you confirm.</div></div>
+    {% if duplicates %}<div class="alert alert-warning">{% icon "triangle-alert" 18 %}<div>This exact file was uploaded before{% for d in duplicates %}{% if d.draft %} (<a href="{% url 'receipts:review' d.draft.uuid %}">{{ d.created_at|date:"j M Y" }}</a>, {{ d.draft.get_review_status_display|lower }}){% endif %}{% endfor %}. Check you are not recording it twice.</div></div>{% endif %}
+
+    <form method="post" action="{% url 'receipts:confirm' draft.uuid %}" class="form" data-editor-form>{% csrf_token %}
+      <input type="hidden" name="version" value="{{ version }}">
+      {% include "includes/purchase_editor.html" %}
+      <div class="sticky-actions btn-row">
+        <button class="btn" type="submit" data-submit-once>{% icon "check" 18 %}Confirm purchase</button>
+        <button class="btn btn-secondary" type="submit" formaction="{% url 'receipts:save' draft.uuid %}" formnovalidate>Save draft</button>
+      </div>
+    </form>
+
+    <section class="card card-pad stack" style="margin-top:18px">
+      <h2 style="font-size:17px">Already recorded this purchase?</h2>
+      <p class="small muted" style="margin:0">Attach this receipt as evidence to an existing purchase instead. No new cost is created.</p>
+      <form method="post" action="{% url 'receipts:attach' draft.uuid %}" class="form">{% csrf_token %}
+        <div class="field"><label for="attach-purchase">Existing purchase</label>
+          <select id="attach-purchase" name="purchase" required><option value="">Choose…</option>
+            {% for p in recent_purchases %}<option value="{{ p.uuid }}">{{ p.transaction_date|date:"j M Y" }} · {{ p.description }} · {{ p.total|gbp }}</option>{% endfor %}</select></div>
+        <div><button class="btn btn-secondary" type="submit">{% icon "paperclip" 18 %}Attach to purchase</button></div>
+      </form>
+      <form method="post" action="{% url 'receipts:discard' draft.uuid %}" data-confirm="Discard this draft? No cost will be recorded.">{% csrf_token %}
+        <button class="btn btn-ghost btn-sm" type="submit">{% icon "trash-2" 16 %}Discard draft</button></form>
+    </section>
+  </div>
+</div>
+{% endblock %}

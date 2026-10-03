@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Record refund{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'costs:purchase_detail' purchase.uuid as back %}{% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><p class="eyebrow">{{ purchase.description }} · {{ purchase.total|gbp }}</p><h1>Record refund</h1></div></header>
+<form method="post" class="card card-pad form" style="max-width:640px">{% csrf_token %}
+  <input type="hidden" name="submission_key" value="{{ submission_key }}">
+  {% if errors %}<div class="alert alert-error" role="alert">{% icon "triangle-alert" 18 %}<div><strong>No refund was recorded.</strong><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div></div>{% endif %}
+  {% include "includes/form_errors.html" %}
+  {% include "includes/field.html" with field=form.transaction_date %}
+  <fieldset style="border:0;padding:0;margin:0" class="stack"><legend class="label" style="margin-bottom:6px">Amount refunded to each destination</legend>
+    {% for row in rows %}
+    <div class="field"><label for="r-{{ forloop.counter }}">{{ row.label }} <span class="muted small">(up to {{ row.max|gbp }})</span></label>
+      <input type="text" inputmode="decimal" id="r-{{ forloop.counter }}" name="amount-{{ row.key }}" value="{{ row.value }}" placeholder="0.00"></div>
+    {% endfor %}
+  </fieldset>
+  {% include "includes/field.html" with field=form.description %}
+  {% include "includes/field.html" with field=form.notes %}
+  <p class="help" style="margin:0">Refunds are stored as positive amounts and subtracted from the matching project or shared total. They cannot exceed what was recorded there.</p>
+  <div class="btn-row"><button class="btn" type="submit" data-submit-once>Record refund</button><a class="btn btn-ghost" href="{{ back }}">Cancel</a></div>
+</form>
+{% endblock %}

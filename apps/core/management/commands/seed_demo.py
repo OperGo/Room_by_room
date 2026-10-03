@@ -1,0 +1,214 @@
+"""Seed a disposable demo account with fictional, clearly labelled sample data.
+
+Idempotent: if the demo account already has data, nothing is changed unless
+``--reset`` is passed. Only accounts flagged ``is_demo`` can ever be reset, so
+the owner's real account is never touched.
+"""
+
+import datetime
+import io
+import secrets
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
+from PIL import Image, ImageDraw
+
+from apps.core.uploads import ValidatedUpload
+from apps.costs import services as cost_services
+from apps.costs.models import Purchase
+from apps.costs.services import AllocationInput, LineInput, PurchaseInput
+from apps.projects import services as project_services
+from apps.projects.models import Project, Task
+from apps.shopping.models import ShoppingItem
+
+D = Decimal
+
+
+def sample_cabinetry_image():
+    """A drawn illustration (not a photograph) of built-in office cabinets."""
+    w, h = 1600, 1000
+    im = Image.new("RGB", (w, h), "#E9E3D6")
+    d = ImageDraw.Draw(im)
+    d.rectangle([0, 760, w, h], fill="#B89B74")  # floor
+    for x in range(0, w, 160):
+        d.line([x, 760, x - 60, h], fill="#A88B66", width=3)
+    d.rectangle([1120, 120, 1460, 520], fill="#F4F1EA", outline="#CFC6B4", width=8)  # window
+    d.line([1290, 120, 1290, 520], fill="#CFC6B4", width=6)
+    d.line([1120, 320, 1460, 320], fill="#CFC6B4", width=6)
+    # tall cabinets
+    green, edge = "#4E6F62", "#3C574C"
+    d.rectangle([140, 140, 520, 760], fill=green, outline=edge, width=6)
+    d.line([330, 140, 330, 760], fill=edge, width=5)
+    for x in (300, 360):
+        d.rounded_rectangle([x, 420, x + 10, 500], radius=4, fill="#D9C9A3")
+    # desk run + shelves
+    d.rectangle([520, 470, 1080, 500], fill="#C9A878", outline="#A8885D", width=4)
+    d.rectangle([520, 500, 640, 760], fill=green, outline=edge, width=6)
+    d.rectangle([960, 500, 1080, 760], fill=green, outline=edge, width=6)
+    for y in (200, 300):
+        d.rectangle([560, y, 1040, y + 16], fill="#C9A878")
+    for i, x in enumerate(range(580, 1000, 46)):
+        d.rectangle([x, 150 + (i % 3) * 8, x + 30, 200], fill=["#8E5C4A", "#3F5E7A", "#C29B48"][i % 3])
+    d.rectangle([0, 0, w, 60], fill="#202923")
+    d.text((24, 18), "SAMPLE IMAGE - illustration, not a photograph of a real home", fill="#F7F5F0")
+    out = io.BytesIO()
+    im.save(out, format="JPEG", quality=88)
+    content = out.getvalue()
+    import hashlib
+
+    return ValidatedUpload(content=content, mime="image/jpeg", size=len(content),
+                           checksum=hashlib.sha256(content).hexdigest(), width=w, height=h)
+
+
+class Command(BaseCommand):
+    help = "Create or refresh the disposable demo account with fictional sample data."
+
+    def add_arguments(self, parser):
+        parser.add_argument("--username", default="demo")
+        parser.add_argument("--password", default=None, help="Defaults to a random password printed once.")
+        parser.add_argument("--reset", action="store_true", help="Delete and recreate the demo account's data.")
+
+    def handle(self, username, password, reset, **options):
+        User = get_user_model()
+        user = User.objects.filter(username=username).first()
+        if user and not user.is_demo:
+            raise CommandError(f"{username!r} is a real account; the seed command only manages demo accounts.")
+        created_password = None
+        if user is None:
+            created_password = password or secrets.token_urlsafe(12)
+            user = User.objects.create_user(username=username, password=created_password, is_demo=True)
+        elif password:
+            user.set_password(password)
+            user.save(update_fields=["password"])
+        if Project.objects.filter(owner=user).exists():
+            if not reset:
+                self.stdout.write("Demo data already present; nothing changed. Use --reset to recreate it.")
+                return
+            self._wipe(user)
+        with transaction.atomic():
+            self._seed(user)
+        self.stdout.write(self.style.SUCCESS(f"Demo data created for {username!r}."))
+        if created_password:
+            self.stdout.write(f"Demo password (shown once): {created_password}")
+
+    def _wipe(self, user):
+        from apps.core.models import ChangeEvent
+        from apps.core.storage import private_storage
+        from apps.costs.models import CostAllocation, OpeningBalanceDecision, OpeningCostBalance, PurchaseEvidence, PurchaseLine
+        from apps.receipts.models import ReceiptDocument, ReceiptDraft
+
+        assert user.is_demo
+        storage = private_storage()
+        with transaction.atomic():
+            from apps.projects.models import ProjectPhoto
+
+            keys = list(ProjectPhoto.objects.filter(project__owner=user).values_list("storage_key", flat=True))
+            keys += list(ReceiptDocument.objects.filter(owner=user).values_list("storage_key", flat=True))
+            ShoppingItem.objects.filter(owner=user).delete()
+            OpeningBalanceDecision.objects.filter(purchase__owner=user).delete()
+            PurchaseEvidence.objects.filter(purchase__owner=user).delete()
+            CostAllocation.objects.filter(line__purchase__owner=user).delete()
+            PurchaseLine.objects.filter(purchase__owner=user).delete()
+            Purchase.objects.filter(owner=user, kind=Purchase.Kind.REFUND).delete()
+            Purchase.objects.filter(owner=user).delete()
+            ReceiptDraft.objects.filter(owner=user).delete()
+            ReceiptDocument.objects.filter(owner=user).delete()
+            OpeningCostBalance.objects.filter(project__owner=user).delete()
+            Project.objects.filter(owner=user).update(cover_photo=None)
+            Project.objects.filter(owner=user).delete()
+            ChangeEvent.objects.filter(owner=user).delete()
+        for key in keys:
+            storage.delete(key)
+
+    def _seed(self, user):
+        office = project_services.save_project(user, Project(
+            title="Office cabinetry", room="Office", status=Project.Status.ACTIVE, budget=D("1200.00"),
+            start_date=datetime.date(2026, 8, 15),
+            notes="Built-in cabinets and shelving along the alcove wall. (Fictional demo project.)",
+        ))
+        hallway = project_services.save_project(user, Project(
+            title="Hallway refresh", room="Hallway", status=Project.Status.ACTIVE, budget=D("400.00"),
+            start_date=datetime.date(2026, 9, 1), notes="Fictional demo project.",
+        ))
+        bathroom = project_services.save_project(user, Project(
+            title="Bathroom retile", room="Bathroom", status=Project.Status.COMPLETED, budget=D("900.00"),
+            start_date=datetime.date(2025, 3, 1), completion_date=datetime.date(2025, 6, 20),
+            notes="Older fictional project with an estimated opening balance.",
+        ))
+        project_services.save_project(user, Project(
+            title="Garden shed shelving", room="Garden", status=Project.Status.PLANNED,
+            notes="Fictional demo project with no tasks yet.",
+        ))
+
+        def task(project, title, minutes=None, status=None):
+            t = project_services.save_task(user, Task(project=project, title=title, estimated_minutes=minutes))
+            if status == "done":
+                project_services.complete_task(user, t)
+            return t
+
+        office_titles = [
+            ("Measure alcoves and walls", 45, "done"), ("Draw cabinet plan", 120, "done"),
+            ("Buy MDF and hardware", 90, "done"), ("Cut carcass panels", 240, "done"),
+            ("Assemble carcasses", 300, "done"), ("Fix carcasses to wall", 180, "done"),
+            ("Fill and sand joints", 120, None), ("Prime cabinets", 150, None),
+            ("Paint top coats", 240, None), ("Fit cable grommets in desk top", 30, None),
+        ]
+        office_tasks = [task(office, *row) for row in office_titles]
+        project_services.set_dependencies(user, office_tasks[7], [office_tasks[6]])
+        project_services.set_dependencies(user, office_tasks[8], [office_tasks[7]])
+        hall = [task(hallway, "Fill ceiling cracks", 60), task(hallway, "Sand and prime ceiling", 90),
+                task(hallway, "Paint walls", 300), task(hallway, "Replace skirting by front door", 120)]
+        project_services.set_dependencies(user, hall[1], [hall[0]])
+        project_services.set_dependencies(user, hall[2], [hall[1]])
+        for title in ("Remove old tiles", "Tile walls", "Grout and seal"):
+            task(bathroom, title, None, "done")
+
+        project_services.add_photo(user, office, sample_cabinetry_image(),
+                                   caption="Sample image — illustrative cabinetry, not a real home", is_sample=True)
+
+        cost_services.create_opening_balance(
+            user, bathroom, amount=D("850.00"), coverage_through=datetime.date(2025, 6, 30),
+            note="Estimate from old bank statements (fictional).",
+        )
+
+        def alloc(project_or_kind, amount):
+            if isinstance(project_or_kind, Project):
+                return AllocationInput("project", D(amount), project_or_kind)
+            return AllocationInput(project_or_kind, D(amount))
+
+        # The CTO brief fixture: £76.50 split across Office and Hallway.
+        cost_services.post_purchase(user, PurchaseInput(
+            description="MDF, filler and primer", merchant="Sample Timber Merchant",
+            transaction_date=datetime.date(2026, 9, 12), total=D("76.50"), lines=[
+                LineInput("18mm MDF sheet", D("32.00"), [alloc(office, "32.00")]),
+                LineInput("Fine surface filler", D("9.50"), [alloc(hallway, "9.50")]),
+                LineInput("Primer undercoat 2.5L", D("35.00"), [alloc(office, "35.00")]),
+            ]))
+        cost_services.post_purchase(user, PurchaseInput(
+            description="Sanding block set", merchant="Sample Tool Shop",
+            transaction_date=datetime.date(2026, 9, 14), total=D("20.00"), lines=[
+                LineInput("Sanding block set", D("20.00"), [alloc("shared_tools", "20.00")], category="tool"),
+            ]))
+        cost_services.post_purchase(user, PurchaseInput(
+            description="Soft-close hinges", merchant="Sample Hardware Co",
+            transaction_date=datetime.date(2026, 9, 20), total=D("48.60"), lines=[
+                LineInput("Soft-close hinges", D("54.00"), [alloc(office, "54.00")], quantity=D("10"), unit_price=D("5.40")),
+                LineInput("Multi-buy discount", D("-5.40"), [alloc(office, "-5.40")], line_type="discount", category="other"),
+            ]))
+
+        def item(description, quantity, unit="", project=None, task_obj=None, retailer="", bought=False):
+            from django.utils import timezone
+
+            ShoppingItem.objects.create(
+                owner=user, description=description, quantity=D(quantity), unit=unit, project=project, task=task_obj,
+                retailer=retailer, purchased_at=timezone.now() if bought else None,
+            )
+
+        item("Decorator's caulk", "2", "tubes", office, office_tasks[6], "Sample Hardware Co")
+        item("Satin paint, 2.5L", "1", "tin", office, office_tasks[8], "Sample Paint Co")
+        item("Cable grommets 60mm", "2", "", office, office_tasks[9], "Sample Hardware Co")
+        item("Ceiling paint, 5L", "1", "tin", hallway, hall[1], "Sample Paint Co")
+        item("Masking tape", "3", "rolls", None, None, "Sample Paint Co")
+        item("Dust sheets", "2", "", None, None, "", bought=True)

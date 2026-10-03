@@ -1,0 +1,152 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}{{ project.title }}{% endblock %}
+{% block content %}
+<header class="topbar">
+  {% url 'projects:list' as back %}{% include "includes/back.html" with href=back label="projects" %}
+  <div class="topbar-title">
+    <p class="eyebrow">{% if project.room %}{{ project.room }} · {% endif %}<span class="badge {% if project.status == 'completed' %}badge-done{% elif project.status == 'archived' %}badge-muted{% elif project.status == 'planned' %}badge-outline{% endif %}">{{ project.get_status_display }}</span></p>
+    <h1>{{ project.title }}</h1>
+  </div>
+  <a class="icon-btn" href="{% url 'projects:edit' project.uuid %}" aria-label="Edit project">{% icon "pencil" 20 %}</a>
+</header>
+
+<div class="split-2 split-wide">
+  <div class="card hero-card">
+    <div class="hero-photo">
+      {% if project.cover_photo %}
+        <img src="{% url 'projects:photo_file' project.cover_photo.uuid %}" alt="{{ project.cover_photo.caption|default:project.title }}">
+        {% if project.cover_photo.is_sample %}<span class="sample-label">Sample image</span>{% endif %}
+      {% else %}
+        <a class="hero-placeholder" href="{% url 'projects:photo_upload' project.uuid %}" style="text-decoration:none">
+          <span style="text-align:center">{% icon "camera" 32 %}<br><span class="small">Add a photo</span></span></a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="stack">
+    <div class="stat">
+      <div class="kv"><span class="stat-label">Task progress</span><span class="small muted">{% if progress.total %}{{ progress.percent }}%{% endif %}</span></div>
+      {% if progress.total %}
+        <div class="stat-value">{{ progress.done }} <span class="small muted" style="font-weight:500">of {{ progress.total }} tasks done</span></div>
+        <div class="progress" style="margin-top:8px" role="progressbar" aria-label="Task progress" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ progress.percent }}%"></span></div>
+      {% else %}<div class="stat-value" style="font-size:18px">No tasks yet</div>{% endif %}
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-label">Recorded cost</div><div class="stat-value money">{{ summary.net|gbp }}</div>
+        {% if summary.opening %}<div class="stat-note">incl. {{ summary.opening|gbp }} estimate</div>{% endif %}</div>
+      <div class="stat"><div class="stat-label">Budget</div><div class="stat-value money">{% if summary.budget is not None %}{{ summary.budget|gbp }}{% else %}—{% endif %}</div>
+        {% if summary.budget_remaining is not None %}<div class="stat-note {% if summary.over_budget %}over{% endif %}">{% if summary.over_budget %}{{ summary.budget_remaining|gbp }} over budget{% else %}{{ summary.budget_remaining|gbp }} remaining{% endif %}</div>{% endif %}</div>
+    </div>
+    {% if summary.budget %}<div class="progress {% if summary.over_budget %}progress-over{% endif %}" role="progressbar" aria-label="Budget used" aria-valuenow="{{ summary.budget_percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ summary.budget_percent }}%"></span></div>
+    <p class="tiny muted" style="margin:0">Spending is not progress: the bar shows budget used, not work done.</p>{% endif %}
+  </div>
+</div>
+
+<nav class="tabs" aria-label="Project sections">
+  <a href="?tab=tasks" {% if tab == "tasks" %}aria-current="page"{% endif %}>{% icon "list-checks" 18 %}Tasks <span class="tab-count">{{ open_tasks|length }}</span></a>
+  <a href="?tab=costs" {% if tab == "costs" %}aria-current="page"{% endif %}>{% icon "receipt-pound-sterling" 18 %}Costs</a>
+  <a href="?tab=photos" {% if tab == "photos" %}aria-current="page"{% endif %}>{% icon "image" 18 %}Photos</a>
+</nav>
+
+{% if tab == "tasks" %}
+  <div class="section-head"><h2>To do</h2><a class="btn btn-sm" href="{% url 'projects:task_create' project.uuid %}">{% icon "plus" 16 %}Add task</a></div>
+  {% if open_tasks %}{% include "includes/task_rows.html" with tasks=open_tasks %}
+  {% else %}<div class="card empty small">{% if done_tasks %}Every task is done.{% else %}No tasks yet. Add the jobs left in this room.{% endif %}</div>{% endif %}
+  <div class="btn-row" style="margin-top:12px">
+    <a class="btn btn-secondary btn-sm" href="{% url 'shopping:create' %}?project={{ project.uuid }}">{% icon "shopping-basket" 16 %}Add shopping item</a>
+  </div>
+  {% if done_tasks %}
+  <section class="section"><div class="section-head"><h2>Done</h2><span class="small muted">{{ done_tasks|length }}</span></div>
+    {% include "includes/task_rows.html" with tasks=done_tasks %}</section>
+  {% endif %}
+  {% if cancelled_tasks %}
+  <details class="disclosure section"><summary>{% icon "chevron-down" 18 %}Cancelled ({{ cancelled_tasks|length }})</summary>
+    <ul class="list card">{% for t in cancelled_tasks %}<li><a class="row" href="{% url 'projects:task_detail' t.uuid %}"><span class="row-main"><span class="row-title muted">{{ t.title }}</span></span><span class="badge badge-muted">Cancelled</span></a></li>{% endfor %}</ul>
+  </details>
+  {% endif %}
+{% elif tab == "costs" %}
+  <div class="split-2">
+    <div class="card card-pad">
+      <h2 style="margin-bottom:12px">Cost summary</h2>
+      <dl class="dl">
+        <dt>Opening balance (estimate)</dt><dd>{{ summary.opening|gbp }}</dd>
+        <dt>Confirmed purchases</dt><dd>{{ summary.purchases|gbp }}</dd>
+        <dt>Refunds</dt><dd>{% if summary.refunds %}−{{ summary.refunds|gbp }}{% else %}{{ summary.refunds|gbp }}{% endif %}</dd>
+        <dt><strong>Net recorded cost</strong></dt><dd><strong>{{ summary.net|gbp }}</strong></dd>
+        <dt>Budget</dt><dd>{% if summary.budget is not None %}{{ summary.budget|gbp }}{% else %}Not set{% endif %}</dd>
+        {% if summary.budget_remaining is not None %}<dt>{% if summary.over_budget %}Over budget{% else %}Remaining{% endif %}</dt><dd class="{% if summary.over_budget %}over{% endif %}">{{ summary.budget_remaining|gbp }}</dd>{% endif %}
+      </dl>
+      <p class="tiny muted" style="margin:12px 0 0">Recorded cost is what you have confirmed, not proof of payment. Shared tools are not counted per project.</p>
+    </div>
+    <div class="stack">
+      <a class="btn" href="{% url 'costs:purchase_create' %}?project={{ project.uuid }}">{% icon "plus" 18 %}Add purchase</a>
+      <a class="btn btn-secondary" href="{% url 'receipts:new' %}">{% icon "camera" 18 %}Add receipt</a>
+      <a class="btn btn-secondary" href="{% url 'projects:opening_balance_create' project.uuid %}">{% icon "history" 18 %}Add opening balance</a>
+    </div>
+  </div>
+  {% if balances %}
+  <section class="section"><div class="section-head"><h2>Opening balances</h2></div>
+    <ul class="list card">{% for b in balances %}
+      <li><a class="row" href="{% url 'projects:opening_balance_edit' b.uuid %}"><span class="row-main"><span class="row-title">Estimate to {{ b.coverage_through|date:"j M Y" }} <span class="badge badge-outline">Estimate</span></span>
+        <span class="row-meta">{{ b.note|default:"No note" }}{% if b.amount != b.original_amount %} · {{ b.original_amount|gbp }} originally, part replaced by itemised purchases{% endif %}</span></span>
+        <span class="row-end money">{{ b.amount|gbp }}</span><span class="chev">{% icon "chevron-right" 18 %}</span></a></li>{% endfor %}
+    </ul></section>
+  {% endif %}
+  <section class="section"><div class="section-head"><h2>Purchases and refunds</h2></div>
+    {% if purchases %}
+    <ul class="list card">{% for p in purchases %}
+      <li><a class="row" href="{% url 'costs:purchase_detail' p.uuid %}">
+        <span class="row-main"><span class="row-title">{{ p.description }}</span>
+          <span class="row-meta">{{ p.transaction_date|date:"j M Y" }}{% if p.merchant %} · {{ p.merchant }}{% endif %} · total {{ p.total|gbp }}</span></span>
+        <span class="row-end">{% if p.is_void %}<span class="badge badge-muted">Void</span>{% elif p.is_refund %}<span class="badge">Refund</span>{% endif %}
+          <span class="money" style="display:block">{% if p.is_refund %}−{% endif %}{{ p.project_share|gbp }}</span></span>
+        <span class="chev">{% icon "chevron-right" 18 %}</span></a></li>{% endfor %}
+    </ul>
+    {% else %}<div class="card empty small">No purchases allocated to this project yet.</div>{% endif %}
+  </section>
+{% else %}
+  <form method="post" action="{% url 'projects:photo_upload' project.uuid %}" enctype="multipart/form-data" class="card card-pad form" style="margin-bottom:16px">{% csrf_token %}
+    <div class="field"><label for="id_photo">Add a photo</label>
+      <input type="file" name="photo" id="id_photo" accept="image/jpeg,image/png,image/heic,image/heif" required></div>
+    <div class="field"><label for="id_caption">Caption <span class="muted small">(optional)</span></label><input type="text" name="caption" id="id_caption" maxlength="200"></div>
+    <div><button class="btn" type="submit">{% icon "upload" 18 %}Upload photo</button></div>
+    <p class="help" style="margin:0">Photos are private. Location data is removed when saved.</p>
+  </form>
+  {% if photos %}
+  <div class="photo-grid">
+    {% for photo in photos %}
+    <figure class="card photo-card" style="margin:0">
+      <div class="ph"><img src="{% url 'projects:photo_file' photo.uuid %}" alt="{{ photo.caption|default:'Project photo' }}" loading="lazy">
+        {% if photo.is_sample %}<span class="sample-label">Sample image</span>{% endif %}</div>
+      <figcaption class="ph-body">
+        <span class="small">{{ photo.caption|default:"No caption" }}{% if project.cover_photo_id == photo.id %} <span class="badge">Cover</span>{% endif %}</span>
+        <div class="btn-row">
+          <form method="post" action="{% url 'projects:photo_cover' photo.uuid %}">{% csrf_token %}
+            {% if project.cover_photo_id == photo.id %}<input type="hidden" name="clear" value="1"><button class="btn btn-ghost btn-sm" type="submit">Remove cover</button>
+            {% else %}<button class="btn btn-ghost btn-sm" type="submit">Set as cover</button>{% endif %}</form>
+          <form method="post" action="{% url 'projects:photo_delete' photo.uuid %}" data-confirm="Delete this photo? Costs are not affected.">{% csrf_token %}
+            <button class="btn btn-danger btn-sm" type="submit">{% icon "trash-2" 16 %}Delete</button></form>
+        </div>
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+  {% else %}<div class="card empty small">No photos yet.</div>{% endif %}
+{% endif %}
+
+<section class="section">
+  <details class="disclosure"><summary>{% icon "chevron-down" 18 %}Project status and notes</summary>
+    <div class="card card-pad stack">
+      {% if project.notes %}<p style="white-space:pre-line">{{ project.notes }}</p>{% endif %}
+      <p class="small muted" style="margin:0">{% if project.start_date %}Started {{ project.start_date|date:"j M Y" }}. {% endif %}{% if project.completion_date %}Completed {{ project.completion_date|date:"j M Y" }}.{% endif %}</p>
+      <div class="btn-row">
+        {% for value, label in project.Status.choices %}{% if value != project.status %}
+        <form method="post" action="{% url 'projects:status' project.uuid %}">{% csrf_token %}
+          <input type="hidden" name="status" value="{{ value }}"><input type="hidden" name="version" value="{{ project.version }}">
+          <button class="btn btn-secondary btn-sm" type="submit">Mark {{ label|lower }}</button></form>
+        {% endif %}{% endfor %}
+      </div>
+      <p class="tiny muted" style="margin:0">Completing or archiving keeps every task, photo and recorded cost.</p>
+    </div>
+  </details>
+</section>
+{% endblock %}

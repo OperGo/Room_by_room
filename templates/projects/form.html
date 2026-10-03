@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}{% if creating %}New project{% else %}Edit {{ project.title }}{% endif %}{% endblock %}
+{% block content %}
+<header class="topbar">
+  {% if creating %}{% url 'projects:list' as back %}{% else %}{% url 'projects:detail' project.uuid as back %}{% endif %}
+  {% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><h1>{% if creating %}New project{% else %}Edit project{% endif %}</h1></div>
+</header>
+<div class="card card-pad" style="max-width:720px">
+  <form method="post" class="form" novalidate>{% csrf_token %}
+    {% include "includes/form_errors.html" %}
+    {{ form.version }}
+    {% include "includes/field.html" with field=form.title %}
+    {% include "includes/field.html" with field=form.room %}
+    {% if form.status %}{% include "includes/field.html" with field=form.status %}{% endif %}
+    {% include "includes/field.html" with field=form.budget %}
+    <div class="field-row">
+      {% include "includes/field.html" with field=form.start_date %}
+      {% include "includes/field.html" with field=form.completion_date %}
+    </div>
+    <p class="help" style="margin-top:-8px">Older projects can use past dates. Add historical costs as an opening balance or backdated purchases.</p>
+    {% include "includes/field.html" with field=form.notes %}
+    <div class="btn-row"><button class="btn" type="submit">{% if creating %}Create project{% else %}Save{% endif %}</button>
+      <a class="btn btn-ghost" href="{{ back }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Void{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'costs:purchase_detail' purchase.uuid as back %}{% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><p class="eyebrow">{{ purchase.description }} · {{ purchase.total|gbp }}</p><h1>Void {% if purchase.is_refund %}refund{% else %}purchase{% endif %}</h1></div></header>
+<div class="card card-pad" style="max-width:640px">
+  <p class="small">A void record stays visible with its reason but no longer counts towards any total. If the amount or allocation was wrong, use <a href="{% url 'costs:purchase_edit' purchase.uuid %}">Correct</a> instead. If the retailer gave money back, record a refund.</p>
+  <form method="post" class="form">{% csrf_token %}
+    {% include "includes/form_errors.html" %}{{ form.version }}
+    {% include "includes/field.html" with field=form.reason %}
+    <div class="btn-row"><button class="btn btn-danger" type="submit">{% icon "ban" 18 %}Void</button><a class="btn btn-ghost" href="{{ back }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

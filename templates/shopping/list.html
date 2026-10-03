@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Shopping{% endblock %}
+{% block content %}
+<header class="topbar">
+  <div class="topbar-title"><p class="eyebrow">{{ to_buy_count }} to buy{% if filter_project %} · {{ filter_project.title }}{% endif %}</p><h1>Shopping list</h1></div>
+  <a class="btn btn-sm" href="{% url 'shopping:create' %}{% if filter_project %}?project={{ filter_project.uuid }}{% endif %}">{% icon "plus" 18 %}Add</a>
+</header>
+
+<div class="split-2 split-wide">
+<div>
+  <div class="kv" style="margin-bottom:14px;align-items:center">
+    <div class="segmented" role="group" aria-label="Group by">
+      <a href="?group=project{% if filter_project %}&project={{ filter_project.uuid }}{% endif %}" {% if group_by == "project" %}aria-current="true"{% endif %}>By project</a>
+      <a href="?group=retailer{% if filter_project %}&project={{ filter_project.uuid }}{% endif %}" {% if group_by == "retailer" %}aria-current="true"{% endif %}>By retailer</a>
+    </div>
+    {% if filter_project %}<a class="small" href="{% url 'shopping:list' %}">Show all</a>{% endif %}
+  </div>
+
+  <form method="post" action="{% url 'shopping:create' %}" class="card quick-add" style="margin-bottom:18px">{% csrf_token %}
+    <label class="visually-hidden" for="quick_description">New item</label>
+    <input type="text" id="quick_description" name="description" placeholder="Add an item, e.g. 18mm MDF sheet" required maxlength="160">
+    <input type="hidden" name="quantity" value="1">
+    {% if filter_project %}<input type="hidden" name="project" value="{{ filter_project.pk }}">{% endif %}
+    <button class="btn" type="submit" aria-label="Add item">{% icon "plus" 20 %}</button>
+  </form>
+
+  {% for group, items in groups %}
+  <section class="section" style="margin-top:0;margin-bottom:22px">
+    <div class="section-head"><h2>{{ group }}</h2><span class="small muted">{{ items|length }}</span></div>
+    <ul class="list card">
+      {% for item in items %}{% include "shopping/item_row.html" %}{% endfor %}
+    </ul>
+  </section>
+  {% empty %}
+  <div class="card empty">{% icon "shopping-basket" 32 %}<p>Nothing to buy. Add materials as you plan each job.</p></div>
+  {% endfor %}
+</div>
+
+<div>
+  <section>
+    <div class="section-head"><h2>Bought</h2><span class="small muted">{{ bought|length }}</span></div>
+    {% if bought %}
+    <ul class="list card">{% for item in bought %}{% include "shopping/item_row.html" %}{% endfor %}</ul>
+    {% else %}<div class="card empty small">Ticked items appear here.</div>{% endif %}
+    <p class="small muted" style="margin-top:10px">Ticking an item as bought does not record a cost. Use <strong>Record purchase</strong> or <a href="{% url 'receipts:new' %}">Add receipt</a> to add spending.</p>
+  </section>
+</div>
+</div>
+{% endblock %}

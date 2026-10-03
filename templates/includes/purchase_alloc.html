@@ -1,0 +1,11 @@
+{% load rbr %}
+<div class="alloc-row {% if single %}single{% endif %}" data-alloc>
+  <label class="visually-hidden" for="l{{ i }}-a{{ j }}-dest">Destination</label>
+  <select id="l{{ i }}-a{{ j }}-dest" name="line-{{ i }}-alloc-{{ j }}-dest" data-alloc-dest>
+    <option value="">Choose project…</option>
+    {% for value, label in destinations %}<option value="{{ value }}" {% if a.dest == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <label class="visually-hidden" for="l{{ i }}-a{{ j }}-amt">Split amount</label>
+  <input class="alloc-amount" type="text" inputmode="decimal" id="l{{ i }}-a{{ j }}-amt" name="line-{{ i }}-alloc-{{ j }}-amount" value="{{ a.amount|default:'' }}" placeholder="£" data-alloc-amount>
+  <button type="button" class="icon-btn alloc-remove" data-remove-alloc aria-label="Remove split">{% icon "x" 16 %}</button>
+</div>

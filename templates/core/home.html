@@ -1,0 +1,90 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<header class="topbar">
+  <div class="topbar-title">
+    <p class="eyebrow">{{ today|date:"l j F" }}</p>
+    <h1>Your projects</h1>
+  </div>
+  <a class="icon-btn mobile-only" href="{% url 'projects:create' %}" aria-label="New project">{% icon "plus" 24 %}</a>
+</header>
+
+<div class="split-2 home-grid">
+  <div class="stack">
+    {% if featured %}
+    <article class="card hero-card">
+      <a href="{% url 'projects:detail' featured.uuid %}" style="color:inherit;text-decoration:none;display:block">
+        <div class="hero-photo">
+          {% if featured.cover_photo %}
+            <img src="{% url 'projects:photo_file' featured.cover_photo.uuid %}" alt="{{ featured.cover_photo.caption|default:featured.title }}">
+            {% if featured.cover_photo.is_sample %}<span class="sample-label">Sample image</span>{% endif %}
+          {% else %}
+            <div class="hero-placeholder">{% icon "image" 36 %}</div>
+          {% endif %}
+        </div>
+        <div class="hero-body">
+          <div class="kv"><span class="badge">{{ featured.get_status_display }}</span>{% if featured.room %}<span class="small muted">{{ featured.room }}</span>{% endif %}</div>
+          <h2 style="margin-top:10px">{{ featured.title }}</h2>
+          {% if featured.progress.total %}
+          <div class="progress-line"><span>{{ featured.progress.done }} of {{ featured.progress.total }} tasks done</span><span>{{ featured.progress.percent }}%</span></div>
+          <div class="progress" role="progressbar" aria-label="Task progress" aria-valuenow="{{ featured.progress.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ featured.progress.percent }}%"></span></div>
+          {% else %}<p class="small muted" style="margin-top:10px">No tasks yet</p>{% endif %}
+          <div class="kv small" style="margin-top:12px"><span class="muted">Recorded cost</span><span class="money"><strong>{{ featured.net_cost|gbp }}</strong>{% if featured.budget is not None %} <span class="muted">of {{ featured.budget|gbp }}</span>{% endif %}</span></div>
+        </div>
+      </a>
+    </article>
+    {% else %}
+    <div class="card empty">
+      {% icon "folder-kanban" 32 %}
+      <p><strong>No active projects yet.</strong></p>
+      <p class="small">Start with the room you are working on now.</p>
+      <a class="btn" href="{% url 'projects:create' %}">{% icon "plus" 18 %}New project</a>
+    </div>
+    {% endif %}
+
+    <a class="receipt-cta" href="{% url 'receipts:new' %}">
+      <span class="cta-icon">{% icon "camera" 22 %}</span>
+      <span style="flex:1">Add receipt<small>Photo, image or PDF · or enter a purchase manually</small></span>
+      {% icon "chevron-right" 20 %}
+    </a>
+    {% if open_drafts %}
+    <a class="alert alert-warning" href="{% url 'costs:index' %}#drafts" style="text-decoration:none;margin:0">{% icon "receipt-pound-sterling" 18 %}<div>{{ open_drafts }} receipt{{ open_drafts|pluralize }} waiting for review. Drafts are not counted in costs.</div></a>
+    {% endif %}
+
+    {% if others %}
+    <section class="section">
+      <div class="section-head"><h2>Other projects</h2><a href="{% url 'projects:list' %}">All projects</a></div>
+      <ul class="list card">
+        {% for p in others %}
+        <li><a class="row" href="{% url 'projects:detail' p.uuid %}">
+          <span class="thumb">{% if p.cover_photo %}<img src="{% url 'projects:photo_file' p.cover_photo.uuid %}" alt="">{% else %}{% icon "folder-kanban" 22 %}{% endif %}</span>
+          <span class="row-main"><span class="row-title">{{ p.title }}</span>
+            <span class="row-meta">{% if p.progress.total %}{{ p.progress.done }} of {{ p.progress.total }} tasks done{% else %}No tasks yet{% endif %} · {{ p.get_status_display }}</span></span>
+          <span class="row-end money small">{{ p.net_cost|gbp }}</span>
+          <span class="chev">{% icon "chevron-right" 18 %}</span>
+        </a></li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    {% if weekend_tasks %}
+    <section>
+      <div class="section-head"><h2>Ready this weekend</h2><span class="small muted">Sat {{ saturday|date:"j M" }}</span></div>
+      {% include "includes/task_rows.html" with tasks=weekend_tasks show_project=True %}
+    </section>
+    {% endif %}
+    <section>
+      <div class="section-head"><h2>Ready to start</h2></div>
+      {% if ready_tasks %}
+        <p class="small muted">Unfinished tasks with nothing left to wait for.</p>
+        {% include "includes/task_rows.html" with tasks=ready_tasks show_project=True %}
+      {% elif not weekend_tasks %}
+        <div class="card empty small">Nothing ready yet. Add tasks to a project to see what you can start next.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

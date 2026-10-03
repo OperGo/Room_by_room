@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+db.sqlite3
+db.sqlite3-journal
+private_storage/
+staticfiles/
+.pytest_cache/
+test-results/
+playwright-report/
+*.log
+# Never commit real receipts, personal photos, exports or databases.
+*.dump
+*.sql
+exports/

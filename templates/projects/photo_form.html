@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Add photo{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'projects:detail' project.uuid as back %}{% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><p class="eyebrow">{{ project.title }}</p><h1>Add photo</h1></div></header>
+<div class="card card-pad" style="max-width:640px">
+  <form method="post" enctype="multipart/form-data" class="form">{% csrf_token %}
+    {% include "includes/form_errors.html" %}
+    <div class="field"><label for="id_photo">Photo</label>
+      <input type="file" name="photo" id="id_photo" accept="image/jpeg,image/png,image/heic,image/heif" required>
+      {{ form.photo.errors }}</div>
+    {% include "includes/field.html" with field=form.caption %}
+    <p class="help" style="margin:0">JPEG, PNG or iPhone HEIC up to 15 MB. Photos are private; location data is removed.</p>
+    <div class="btn-row"><button class="btn" type="submit">{% icon "upload" 18 %}Upload</button><a class="btn btn-ghost" href="{{ back }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,1 @@
+{% load rbr %}{% if form.non_field_errors %}<div class="alert alert-error" role="alert">{% icon "triangle-alert" 18 %}<div>{% for e in form.non_field_errors %}<p style="margin:0">{{ e }}</p>{% endfor %}</div></div>{% endif %}

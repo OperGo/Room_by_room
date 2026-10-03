@@ -1,0 +1,68 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}{{ purchase.description }}{% endblock %}
+{% block content %}
+<header class="topbar">
+  {% url 'costs:index' as back %}{% include "includes/back.html" with href=back label="costs" %}
+  <div class="topbar-title"><p class="eyebrow">{% if purchase.is_refund %}Refund{% else %}Purchase{% endif %} · {{ purchase.transaction_date|date:"j M Y" }}{% if purchase.merchant %} · {{ purchase.merchant }}{% endif %}</p>
+    <h1>{{ purchase.description }}</h1></div>
+</header>
+
+{% if purchase.is_void %}<div class="alert alert-warning">{% icon "ban" 18 %}<div><strong>Void</strong> — not counted in any total. Reason: {{ purchase.void_reason }}</div></div>{% endif %}
+
+<div class="split-2 split-wide">
+<div class="stack">
+  <div class="card">
+    <div class="card-pad kv" style="align-items:center;border-bottom:1px solid var(--line)">
+      <span><span class="badge {% if purchase.is_void %}badge-muted{% else %}badge-done{% endif %}">{{ purchase.get_status_display }}</span>
+        {% if purchase.is_refund %}<span class="badge">Refund</span>{% endif %}</span>
+      <span class="stat-value money" style="margin:0">{% if purchase.is_refund %}−{% endif %}{{ purchase.total|gbp }}</span>
+    </div>
+    {% if purchase.is_refund and purchase.original_purchase %}<p class="card-pad small" style="margin:0;border-bottom:1px solid var(--line)">Refund of <a href="{% url 'costs:purchase_detail' purchase.original_purchase.uuid %}">{{ purchase.original_purchase.description }}</a> ({{ purchase.original_purchase.transaction_date|date:"j M Y" }}).</p>{% endif %}
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th scope="col">Line</th><th scope="col">Belongs to</th><th scope="col" class="num">Amount</th></tr></thead>
+      <tbody>{% for line in lines %}<tr>
+        <td><strong style="font-weight:600">{{ line.description }}</strong><br><span class="tiny muted">{% if line.line_type != "item" %}{{ line.get_line_type_display }} · {% endif %}{{ line.get_category_display }}{% if line.quantity != 1 %} · qty {{ line.quantity|floatformat:"-3" }}{% endif %}{% if line.unit_price %} · {{ line.unit_price|gbp }} each{% endif %}</span>
+          {% for item in line.shopping_items.all %}<br><span class="badge badge-outline">{% icon "shopping-basket" 12 %}{{ item.description }}</span>{% endfor %}</td>
+        <td class="small">{% for a in line.allocations.all %}{% if a.project %}<a href="{% url 'projects:detail' a.project.uuid %}?tab=costs">{{ a.project.title }}</a>{% else %}{{ a.get_destination_display }}{% endif %}{% if line.allocations.all|length > 1 %} <span class="money muted">{{ a.amount|gbp }}</span>{% endif %}<br>{% endfor %}</td>
+        <td class="num money">{{ line.amount|gbp }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% if purchase.notes %}<div class="card card-pad"><p class="small" style="margin:0;white-space:pre-line">{{ purchase.notes }}</p></div>{% endif %}
+
+  {% if decisions %}<div class="card card-pad"><h2 style="margin-bottom:8px">Opening balance decisions</h2>
+    <ul class="history">{% for d in decisions %}<li>{{ d.balance.project.title }} estimate to {{ d.balance.coverage_through|date:"j M Y" }}: <strong>{{ d.get_decision_display }}</strong>{% if d.amount_replaced %} ({{ d.amount_replaced|gbp }}){% endif %}{% if d.reversed_at %} · <span class="muted">reversed {{ d.reversed_at|date:"j M Y" }}</span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+
+  {% if refunds %}<div class="card card-pad"><h2 style="margin-bottom:8px">Refunds</h2>
+    <ul class="list">{% for r in refunds %}<li><a class="row" style="padding-left:0;padding-right:0" href="{% url 'costs:purchase_detail' r.uuid %}"><span class="row-main"><span class="row-title">{{ r.description }}</span><span class="row-meta">{{ r.transaction_date|date:"j M Y" }}</span></span>
+      {% if r.is_void %}<span class="badge badge-muted">Void</span>{% endif %}<span class="money">−{{ r.total|gbp }}</span></a></li>{% endfor %}</ul>
+    <div class="kv small" style="margin-top:8px"><span class="muted">Net after refunds</span><span class="money"><strong>{{ net_after_refunds|gbp }}</strong></span></div></div>{% endif %}
+</div>
+
+<div class="stack">
+  <section class="card card-pad">
+    <h2 style="margin-bottom:8px">Evidence</h2>
+    {% for ev in evidence %}
+      <a class="row" style="padding-left:0" href="{% url 'receipts:file' ev.document.uuid %}" target="_blank" rel="noopener">
+        <span class="thumb">{% if ev.document.is_pdf %}{% icon "file-text" 22 %}{% else %}{% icon "file-image" 22 %}{% endif %}</span>
+        <span class="row-main"><span class="row-title">Receipt {% if ev.document.is_pdf %}PDF{% else %}image{% endif %}</span><span class="row-meta">Added {{ ev.created_at|date:"j M Y" }}</span></span>{% icon "download" 18 %}</a>
+    {% empty %}<p class="small muted" style="margin:0">No receipt attached. Upload one from <a href="{% url 'receipts:new' %}">Add receipt</a> and choose “Attach to existing purchase”.</p>{% endfor %}
+  </section>
+  {% if not purchase.is_void %}
+  <section class="card card-pad stack">
+    <h2>Actions</h2>
+    {% if not purchase.is_refund %}<a class="btn btn-secondary" href="{% url 'costs:purchase_edit' purchase.uuid %}">{% icon "pencil" 18 %}Correct details or allocation</a>{% endif %}
+    {% if can_refund %}<a class="btn btn-secondary" href="{% url 'costs:purchase_refund' purchase.uuid %}">{% icon "undo-2" 18 %}Record refund</a>{% endif %}
+    <a class="btn btn-danger" href="{% url 'costs:purchase_void' purchase.uuid %}">{% icon "ban" 18 %}Void this {% if purchase.is_refund %}refund{% else %}purchase{% endif %}</a>
+    <p class="tiny muted" style="margin:0">Use a correction for mistakes in what was entered, a refund for money returned by the retailer, and void only for records that should never have existed.</p>
+  </section>
+  {% endif %}
+  <section class="card card-pad"><h2 style="margin-bottom:8px">History</h2>
+    <ul class="history">{% for e in history %}<li><strong>{{ e.action|action_label }}</strong> · {{ e.created_at|date:"j M Y H:i" }}
+      {% if e.reason %}<br><span class="muted">Reason: {{ e.reason }}</span>{% endif %}
+      {% if e.action == "corrected" %}<details><summary class="small">Previous version</summary><p class="tiny muted" style="margin:4px 0 0">{{ e.before.description }} · {{ e.before.date }} · £{{ e.before.total }}<br>{% for l in e.before.lines %}{{ l.description }} £{{ l.amount }} → {% for a in l.allocations %}{{ a.to }} £{{ a.amount }}{% if not forloop.last %}, {% endif %}{% endfor %}<br>{% endfor %}</p></details>{% endif %}
+    </li>{% empty %}<li class="muted">No history.</li>{% endfor %}</ul>
+  </section>
+</div>
+</div>
+{% endblock %}

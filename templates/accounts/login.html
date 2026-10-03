@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="login-wrap" style="min-height:80vh">
+  <div class="login-card">
+    <p class="brand" style="margin-bottom:22px"><span class="brand-mark">{% icon "layers" 20 %}</span>Room by Room</p>
+    <div class="card card-pad">
+      <h1 style="font-size:24px;margin-bottom:6px">Sign in</h1>
+      <p class="muted small">Your projects, shopping and costs, room by room.</p>
+      {% if form.non_field_errors %}<div class="alert alert-error">{% icon "triangle-alert" 18 %}<div>{{ form.non_field_errors|join:" " }}</div></div>{% endif %}
+      <form method="post" class="form">{% csrf_token %}
+        <div class="field"><label for="id_username">Username</label><input type="text" name="username" id="id_username" autocomplete="username" autocapitalize="none" required value="{{ form.username.value|default:'' }}"></div>
+        <div class="field"><label for="id_password">Password</label><input type="password" name="password" id="id_password" autocomplete="current-password" required></div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button class="btn btn-block" type="submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

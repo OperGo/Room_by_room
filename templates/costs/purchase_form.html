@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}{% if purchase %}Correct purchase{% else %}Add purchase{% endif %}{% endblock %}
+{% block content %}
+<header class="topbar">
+  {% if purchase %}{% url 'costs:purchase_detail' purchase.uuid as back %}{% else %}{% url 'costs:index' as back %}{% endif %}
+  {% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><p class="eyebrow">{% if purchase %}Correction · keeps history{% else %}Manual entry · no receipt needed{% endif %}</p>
+    <h1>{% if purchase %}Correct purchase{% else %}Add purchase{% endif %}</h1></div>
+</header>
+<form method="post" class="form" style="max-width:860px" data-editor-form>{% csrf_token %}
+  {% if submission_key %}<input type="hidden" name="submission_key" value="{{ submission_key }}">{% endif %}
+  {% if purchase %}<input type="hidden" name="version" value="{{ version }}">{% endif %}
+  {% if shopping_item %}<div class="alert alert-info">{% icon "shopping-basket" 18 %}<div>Recording the purchase of “{{ shopping_item.description }}”. The shopping item will be linked so it cannot be recorded twice.</div></div>{% endif %}
+  {% include "includes/purchase_editor.html" %}
+  {% if purchase %}
+  <div class="card card-pad"><div class="field"><label for="f-reason">Reason for correction</label>
+    <textarea id="f-reason" name="reason" rows="2" required>{{ reason }}</textarea>
+    <p class="help" style="margin:0">Corrections replace the lines; the previous version stays in the history.</p></div></div>
+  {% endif %}
+  <div class="sticky-actions btn-row">
+    <button class="btn" type="submit" data-submit-once>{% icon "check" 18 %}{% if purchase %}Save correction{% else %}Record purchase{% endif %}</button>
+    <a class="btn btn-ghost" href="{{ back }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

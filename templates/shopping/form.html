@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}{% if creating %}Add item{% else %}Edit item{% endif %}{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'shopping:list' as back %}{% include "includes/back.html" with href=back label="shopping list" %}
+  <div class="topbar-title"><h1>{% if creating %}Add item{% else %}Edit item{% endif %}</h1></div></header>
+<div class="card card-pad" style="max-width:720px">
+  <form method="post" class="form" novalidate>{% csrf_token %}
+    {% include "includes/form_errors.html" %}{{ form.version }}
+    {% include "includes/field.html" with field=form.description %}
+    <div class="field-row">{% include "includes/field.html" with field=form.quantity %}{% include "includes/field.html" with field=form.unit %}</div>
+    {% include "includes/field.html" with field=form.project %}
+    {% include "includes/field.html" with field=form.task %}
+    {% include "includes/field.html" with field=form.retailer %}
+    {% include "includes/field.html" with field=form.notes %}
+    <div class="btn-row"><button class="btn" type="submit">{% if creating %}Add to list{% else %}Save{% endif %}</button><a class="btn btn-ghost" href="{{ back }}">Cancel</a></div>
+  </form>
+  {% if item %}
+  <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
+  <form method="post" action="{% url 'shopping:delete' item.uuid %}" data-confirm="Remove this item from the list?">{% csrf_token %}
+    <button class="btn btn-danger btn-sm" type="submit">{% icon "trash-2" 16 %}Remove item</button></form>
+  {% endif %}
+</div>
+{% endblock %}

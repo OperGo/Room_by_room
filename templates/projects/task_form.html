@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}{% if creating %}New task{% else %}Edit task{% endif %}{% endblock %}
+{% block content %}
+<header class="topbar">
+  {% if creating %}{% url 'projects:detail' project.uuid as back %}{% else %}{% url 'projects:task_detail' task.uuid as back %}{% endif %}
+  {% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><p class="eyebrow">{{ project.title }}</p><h1>{% if creating %}New task{% else %}Edit task{% endif %}</h1></div>
+</header>
+<div class="card card-pad" style="max-width:720px">
+  <form method="post" class="form" novalidate>{% csrf_token %}
+    {% include "includes/form_errors.html" %}{{ form.version }}
+    {% include "includes/field.html" with field=form.title %}
+    <div class="field-row">
+      {% include "includes/field.html" with field=form.estimated_minutes %}
+      {% include "includes/field.html" with field=form.due_date %}
+    </div>
+    {% include "includes/field.html" with field=form.notes %}
+    <div class="btn-row"><button class="btn" type="submit">{% if creating %}Add task{% else %}Save{% endif %}</button>
+      {% if creating %}<button class="btn btn-secondary" type="submit" name="add_another" value="1">Add and add another</button>{% endif %}
+      <a class="btn btn-ghost" href="{{ back }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

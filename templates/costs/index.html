@@ -1,0 +1,76 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Costs{% endblock %}
+{% block content %}
+<header class="topbar">
+  <div class="topbar-title"><p class="eyebrow">Recorded costs · GBP</p><h1>Costs</h1></div>
+  <a class="btn btn-sm btn-secondary" href="{% url 'costs:purchase_create' %}">{% icon "plus" 18 %}Purchase</a>
+  <a class="btn btn-sm" href="{% url 'receipts:new' %}">{% icon "camera" 18 %}Receipt</a>
+</header>
+
+<div class="stat-row" style="margin-bottom:18px">
+  <div class="stat"><div class="stat-label">{% if filtered %}Net in view{% else %}Total recorded{% endif %}</div><div class="stat-value money">{{ summary.total|gbp }}</div></div>
+  <div class="stat"><div class="stat-label">Projects</div><div class="stat-value money">{{ summary.projects_with_opening|gbp }}</div>{% if summary.opening %}<div class="stat-note">incl. {{ summary.opening|gbp }} estimates</div>{% endif %}</div>
+  <div class="stat"><div class="stat-label">Shared tools</div><div class="stat-value money">{{ summary.shared_tools|gbp }}</div></div>
+  <div class="stat"><div class="stat-label">Unallocated</div><div class="stat-value money">{{ summary.unallocated|gbp }}</div></div>
+</div>
+
+{% if drafts %}
+<section class="section" id="drafts" style="margin-top:0;margin-bottom:22px">
+  <div class="section-head"><h2>Receipts to review</h2><span class="badge badge-draft">Draft · not counted</span></div>
+  <ul class="list card">{% for d in drafts %}
+    <li><a class="row" href="{% url 'receipts:review' d.uuid %}"><span class="thumb">{% icon "file-text" 22 %}</span>
+      <span class="row-main"><span class="row-title">{{ d.data.merchant|default:"Receipt" }}{% if d.data.description %} · {{ d.data.description }}{% endif %}</span>
+        <span class="row-meta">Uploaded {{ d.created_at|date:"j M Y, H:i" }}{% if d.document.original_filename %} · {{ d.document.original_filename|truncatechars:32 }}{% endif %}</span></span>
+      <span class="badge badge-draft">Draft</span><span class="chev">{% icon "chevron-right" 18 %}</span></a></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<details class="disclosure" {% if filtered %}open{% endif %}><summary>{% icon "search" 18 %}Filter purchases{% if filtered %} (active){% endif %}</summary>
+<form method="get" class="filters card card-pad" style="margin-bottom:18px">
+  <div class="field"><label for="id_project">Project</label>{{ form.project }}</div>
+  <div class="field"><label for="id_merchant">Retailer</label>{{ form.merchant }}</div>
+  <div class="field"><label for="id_date_from">From</label>{{ form.date_from }}</div>
+  <div class="field"><label for="id_date_to">To (inclusive)</label>{{ form.date_to }}</div>
+  <div class="btn-row wide"><button class="btn btn-secondary btn-sm" type="submit">Apply</button>{% if filtered %}<a class="btn btn-ghost btn-sm" href="{% url 'costs:index' %}">Clear</a>{% endif %}</div>
+</form>
+</details>
+{% if filtered %}<p class="small muted">Opening-balance estimates are excluded while a date or retailer filter is active.</p>{% endif %}
+
+<div class="split-2 split-wide">
+<section>
+  <div class="section-head"><h2>Confirmed purchases and refunds</h2><span class="small muted">{{ purchases|length }}</span></div>
+  {% if purchases %}
+  <div class="card mobile-only"><ul class="list">{% for p in purchases %}
+    <li><a class="row" href="{% url 'costs:purchase_detail' p.uuid %}">
+      <span class="row-main"><span class="row-title">{{ p.description }}</span>
+        <span class="row-meta">{{ p.transaction_date|date:"j M Y" }}{% if p.merchant %} · {{ p.merchant }}{% endif %}</span></span>
+      <span class="row-end">{% if p.is_void %}<span class="badge badge-muted">Void</span>{% elif p.is_refund %}<span class="badge">Refund</span>{% endif %}
+        <span class="money" style="display:block;{% if p.is_void %}text-decoration:line-through;color:var(--muted){% endif %}">{% if p.is_refund %}−{% endif %}{{ p.total|gbp }}</span></span>
+    </a></li>{% endfor %}</ul></div>
+  <div class="card table-wrap desktop-only"><table class="data">
+    <thead><tr><th scope="col">Date</th><th scope="col">Description</th><th scope="col">Retailer</th><th scope="col">Status</th><th scope="col" class="num">Amount</th></tr></thead>
+    <tbody>{% for p in purchases %}<tr>
+      <td class="num" style="text-align:left">{{ p.transaction_date|date:"j M Y" }}</td>
+      <td><a href="{% url 'costs:purchase_detail' p.uuid %}">{{ p.description }}</a></td>
+      <td>{{ p.merchant|default:"—" }}</td>
+      <td>{% if p.is_void %}<span class="badge badge-muted">Void</span>{% elif p.is_refund %}<span class="badge">Refund</span>{% else %}<span class="badge badge-done">Confirmed</span>{% endif %}</td>
+      <td class="num money" {% if p.is_void %}style="text-decoration:line-through;color:var(--muted)"{% endif %}>{% if p.is_refund %}−{% endif %}{{ p.total|gbp }}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}<div class="card empty small">No purchases {% if filtered %}match these filters{% else %}recorded yet{% endif %}.</div>{% endif %}
+</section>
+<section>
+  <div class="section-head"><h2>By project</h2></div>
+  {% if project_rows %}
+  <div class="card table-wrap"><table class="data">
+    <thead><tr><th scope="col">Project</th><th scope="col" class="num">Net cost</th><th scope="col" class="num">Budget left</th></tr></thead>
+    <tbody>{% for r in project_rows %}<tr>
+      <td><a href="{% url 'projects:detail' r.project.uuid %}?tab=costs">{{ r.project.title }}</a></td>
+      <td class="num money">{{ r.net|gbp }}</td>
+      <td class="num money {% if r.remaining is not None and r.remaining < 0 %}over{% endif %}">{% if r.remaining is None %}—{% else %}{{ r.remaining|gbp }}{% endif %}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}<div class="card empty small">No projects yet.</div>{% endif %}
+  <p class="tiny muted" style="margin-top:10px">Recorded cost is what you have confirmed. It is not a bank ledger or proof of payment. Shared tools and unallocated amounts count once in the total, never per project.</p>
+</section>
+</div>
+{% endblock %}

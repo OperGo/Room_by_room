@@ -1,0 +1,21 @@
+{% load rbr %}
+<li class="shop-item {% if item.is_bought %}bought{% endif %}">
+  <form method="post" action="{% url 'shopping:toggle_bought' item.uuid %}">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="shop-check {% if item.is_bought %}checked{% endif %}" aria-pressed="{% if item.is_bought %}true{% else %}false{% endif %}"
+      aria-label="{% if item.is_bought %}Mark {{ item.description }} not bought{% else %}Mark {{ item.description }} bought{% endif %}" {% if item.purchase_line_id %}disabled title="Linked to a recorded purchase"{% endif %}>
+      <span class="box">{% if item.is_bought %}{% icon "check" 14 %}{% endif %}</span></button>
+  </form>
+  <a class="row-main" href="{% url 'shopping:edit' item.uuid %}" style="color:inherit;text-decoration:none">
+    <span class="row-title">{{ item.description }}</span>
+    <span class="row-meta"><span class="qty">{{ item.quantity|floatformat:"-2" }}{% if item.unit %} {{ item.unit }}{% endif %}</span>
+      {% if group_by == "retailer" and item.project %} · {{ item.project.title }}{% elif item.retailer %} · {{ item.retailer }}{% endif %}
+      {% if item.task %} · {{ item.task.title }}{% endif %}
+      {% if item.purchase_line_id %} · <span class="badge badge-done">Purchase recorded</span>{% endif %}</span>
+  </a>
+  {% if item.purchase_line_id %}
+    <a class="btn btn-ghost btn-sm" href="{% url 'costs:purchase_detail' item.purchase_line.purchase.uuid %}">View</a>
+  {% else %}
+    <a class="btn btn-ghost btn-sm" href="{% url 'costs:purchase_create' %}?shopping={{ item.uuid }}" aria-label="Record purchase for {{ item.description }}">{% icon "receipt-pound-sterling" 16 %}<span class="desktop-only">Record purchase</span></a>
+  {% endif %}
+</li>

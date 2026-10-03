@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Add receipt{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'costs:index' as back %}{% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><h1>Add receipt</h1></div></header>
+
+<form method="post" enctype="multipart/form-data" data-receipt-upload style="max-width:860px">{% csrf_token %}
+  {% if form.receipt.errors %}<div class="alert alert-error" role="alert">{% icon "triangle-alert" 18 %}<div>{{ form.receipt.errors|join:" " }}</div></div>{% endif %}
+  <div class="upload-options">
+    <label class="upload-option"><span class="opt-icon">{% icon "camera" 22 %}</span><span>Take photo<small>Use the camera</small></span>
+      <input type="file" name="receipt" accept="image/*" capture="environment" data-auto-submit aria-label="Take a photo of the receipt"></label>
+    <label class="upload-option"><span class="opt-icon">{% icon "image" 22 %}</span><span>Upload image<small>JPEG, PNG or iPhone HEIC</small></span>
+      <input type="file" name="receipt" accept="image/jpeg,image/png,image/heic,image/heif" data-auto-submit aria-label="Upload a receipt image"></label>
+    <label class="upload-option"><span class="opt-icon">{% icon "file-text" 22 %}</span><span>Upload PDF<small>Up to 5 pages</small></span>
+      <input type="file" name="receipt" accept="application/pdf" data-auto-submit aria-label="Upload a receipt PDF"></label>
+  </div>
+  <noscript><button class="btn" type="submit" style="margin-top:12px">Upload</button></noscript>
+  <p class="small muted" style="margin-top:12px" data-upload-status aria-live="polite">Files up to 15 MB. The original is kept privately and only you can open it.</p>
+</form>
+
+<div class="alert alert-info" style="max-width:860px;margin-top:8px">{% icon "info" 18 %}<div>
+  {% if extraction_available %}When you choose a file it is sent to the configured AI provider to read the receipt. You review everything before any cost is recorded.
+  {% else %}<strong>{{ extraction_message }}</strong> Nothing is sent to an AI provider. Nothing counts towards your costs until you confirm the details.{% endif %}
+</div></div>
+
+<div class="card card-pad" style="max-width:860px;margin-top:8px">
+  <div class="kv" style="align-items:center"><div><h2 style="font-size:17px">No receipt?</h2><p class="small muted" style="margin:0">Enter a purchase manually. A file is never required.</p></div>
+  <a class="btn btn-secondary" href="{% url 'costs:purchase_create' %}">{% icon "pencil" 18 %}Manual entry</a></div>
+</div>
+{% endblock %}

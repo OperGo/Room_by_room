@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Dependencies{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'projects:task_detail' task.uuid as back %}{% include "includes/back.html" with href=back %}
+  <div class="topbar-title"><p class="eyebrow">{{ task.title }}</p><h1>Dependencies</h1></div></header>
+<div class="card card-pad" style="max-width:640px">
+  <form method="post" class="form">{% csrf_token %}
+    {% if form.prerequisites.errors %}<div class="alert alert-error" role="alert">{% icon "triangle-alert" 18 %}<div>{{ form.prerequisites.errors|join:" " }}</div></div>{% endif %}
+    <fieldset style="border:0;padding:0;margin:0"><legend class="label" style="margin-bottom:6px">This task waits for</legend>
+      <ul class="checkbox-list">{% for choice in form.prerequisites %}<li><label>{{ choice.tag }}{{ choice.choice_label }}</label></li>{% empty %}<li class="muted small" style="padding:10px 0">No other tasks in this project.</li>{% endfor %}</ul>
+    </fieldset>
+    <p class="help" style="margin:0">Only tasks in {{ project.title }} can be chosen. Loops are refused. Changing dependencies never undoes a completed task.</p>
+    <div class="btn-row"><button class="btn" type="submit">Save dependencies</button><a class="btn btn-ghost" href="{{ back }}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

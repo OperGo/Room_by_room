@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% load rbr %}
+{% block title %}Opening balance{% endblock %}
+{% block content %}
+<header class="topbar">{% url 'projects:detail' project.uuid as back_base %}{% with back=back_base|add:"?tab=costs" %}{% include "includes/back.html" with href=back %}{% endwith %}
+  <div class="topbar-title"><p class="eyebrow">{{ project.title }}</p><h1>{% if creating %}Add opening balance{% else %}Opening balance{% endif %}</h1></div></header>
+<div class="split-2">
+<div class="card card-pad">
+  <p class="small muted">An estimate of what was spent before you started recording purchases. It counts towards this project's cost but has no itemised evidence.</p>
+  <form method="post" class="form" novalidate>{% csrf_token %}
+    {% include "includes/form_errors.html" %}{{ form.version }}
+    {% include "includes/field.html" with field=form.amount %}
+    {% include "includes/field.html" with field=form.coverage_through %}
+    {% include "includes/field.html" with field=form.note %}
+    {% if not creating %}
+      {% if balance.amount != balance.original_amount %}<p class="help">Remaining {{ balance.amount|gbp }} of {{ balance.original_amount|gbp }} after replacements by itemised purchases.</p>{% endif %}
+      {% include "includes/field.html" with field=form.reason %}
+    {% endif %}
+    <div class="btn-row"><button class="btn" type="submit">Save</button></div>
+  </form>
+</div>
+{% if not creating %}
+<div class="stack">
+  {% if decisions %}<section class="card card-pad"><h2 style="margin-bottom:8px">Purchases in the covered period</h2>
+    <ul class="history">{% for d in decisions %}<li><a href="{% url 'costs:purchase_detail' d.purchase.uuid %}">{{ d.purchase.description }}</a> · {{ d.get_decision_display }}{% if d.amount_replaced %} ({{ d.amount_replaced|gbp }}){% endif %}{% if d.reversed_at %} · <span class="muted">reversed</span>{% endif %}</li>{% endfor %}</ul></section>{% endif %}
+  {% if history %}<section class="card card-pad"><h2 style="margin-bottom:8px">History</h2>
+    <ul class="history">{% for e in history %}<li><strong>{{ e.action|action_label }}</strong> · {{ e.created_at|date:"j M Y H:i" }}{% if e.reason %}<br><span class="muted">{{ e.reason }}</span>{% endif %}</li>{% endfor %}</ul></section>{% endif %}
+</div>
+{% endif %}
+</div>
+{% endblock %}

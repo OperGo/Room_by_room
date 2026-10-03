@@ -67,6 +67,10 @@ def _review_context(request, draft, editor, **extra):
         extraction_available=available, extraction_message=message, provider_note=provider_note,
         recent_purchases=recent, version=draft.version,
         job=job, job_state=jobs.job_state(job), extraction=(draft.data or {}).get("extraction") or {},
+        # Any editor rebuilt from a POST (validation errors, overlap choices, GBP or duplicate
+        # acknowledgement, stale confirmation, save conflict) holds the owner's unsaved values:
+        # the page must start dirty so polling never reloads it and Read/Retry stay blocked.
+        editor_submitted=editor.data is not None,
     )
     context.update(extra)
     return context

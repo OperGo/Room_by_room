@@ -1,0 +1,40 @@
+{
+  "confirmed_purchases": 3,
+  "files": {
+    "count": 3,
+    "digest": "074d248a3b8e6720d50079b03e739dd89a9089e174c896ab60c45c011c74a50b",
+    "missing_references": 0,
+    "receipt_checksum_mismatches": 0,
+    "references": 3,
+    "size_mismatches": 0
+  },
+  "money": {
+    "owner-1": {
+      "overall_total": "995.10",
+      "projects": {
+        "1b7efefe-5ffb-49a7-8084-9345ed60c1af": "0.00",
+        "7f0fba12-26d4-4eb0-87cf-c3495f9b630f": "9.50",
+        "de898934-2460-46b4-bd9d-889284e732c9": "115.60",
+        "ef299ff9-7ade-4210-b5bd-ba078cd491b8": "850.00"
+      }
+    }
+  },
+  "row_counts": {
+    "core.ChangeEvent": 17,
+    "core.StoredFile": 3,
+    "costs.CostAllocation": 6,
+    "costs.OpeningBalanceDecision": 0,
+    "costs.OpeningCostBalance": 1,
+    "costs.Purchase": 3,
+    "costs.PurchaseEvidence": 0,
+    "costs.PurchaseLine": 6,
+    "projects.Project": 4,
+    "projects.ProjectPhoto": 2,
+    "projects.Task": 17,
+    "projects.TaskDependency": 4,
+    "receipts.ExtractionJob": 0,
+    "receipts.ReceiptDocument": 1,
+    "receipts.ReceiptDraft": 1,
+    "shopping.ShoppingItem": 6
+  }
+}

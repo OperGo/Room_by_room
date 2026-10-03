@@ -1,6 +1,14 @@
 # Render Blueprint for Room by Room — PREPARED FOR REVIEW, NOT APPLIED.
-# Target: the founder's existing Render project "Room by Room". Applying this creates paid
-# resources (≈ US$20/month, see docs/deployment-render.md); do it only after CTO/founder approval.
+# Applying this creates paid resources (≈ US$20.30/month before tax, see docs/deployment-render.md);
+# do it only after explicit founder approval.
+#
+# Project: there is deliberately NO `projects:` key. Declaring one could create a second
+# "Room by Room" project. After the Blueprint sync, move the three resources (and the env group)
+# into the EXISTING "Room by Room" project from the dashboard (select → Move).
+#
+# Secrets: ANTHROPIC_API_KEY is NOT declared here. After creation, add it privately to the
+# `room-by-room-shared` env group in the dashboard; both services inherit it from the group.
+# Until then the app shows "Automatic extraction not configured" and manual entry works.
 
 envVarGroups:
   - name: room-by-room-shared
@@ -23,15 +31,14 @@ envVarGroups:
         value: anthropic
       - key: RECEIPT_MODEL
         value: claude-haiku-4-5-20251001
-      - key: ANTHROPIC_API_KEY
-        sync: false          # entered privately in the Render dashboard; never committed
 
 services:
   - type: web
     name: room-by-room-web
     runtime: python
-    plan: starter
+    plan: 0.5c-512mb
     region: frankfurt
+    autoDeployTrigger: "off"     # deploys are manual and deliberate
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
     preDeployCommand: python manage.py migrate --noinput
     startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
@@ -46,11 +53,12 @@ services:
   - type: worker
     name: room-by-room-receipts
     runtime: python
-    plan: starter
+    plan: 0.5c-512mb
     region: frankfurt
+    autoDeployTrigger: "off"
     buildCommand: pip install -r requirements.txt
     startCommand: python manage.py process_receipts --watch --interval 3
-    maxShutdownDelaySeconds: 90   # lets an in-flight reading (60 s timeout) finish after SIGTERM
+    maxShutdownDelaySeconds: 90   # SIGTERM: the job in hand (≤ 60 s provider timeout) finishes, nothing new is claimed
     envVars:
       - fromGroup: room-by-room-shared
       - key: DATABASE_URL
@@ -60,8 +68,11 @@ services:
 
 databases:
   - name: room-by-room-db
-    plan: basic-256mb
+    plan: 0.1c-256mb
     region: frankfurt
+    postgresMajorVersion: "16"
+    diskSizeGB: 1
+    storageAutoscalingEnabled: false   # growth is an approved cost change, never automatic
     databaseName: roombyroom
     user: roombyroom
     ipAllowList: []          # no public access; services connect over Render's private network

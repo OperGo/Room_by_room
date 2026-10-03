@@ -320,3 +320,78 @@ def test_edit_before_read_or_retry_is_stopped_until_saved(phone, live_server, ow
     phone.get_by_role("button", name="Read receipt automatically").click()
     expect(phone.get_by_text("Waiting to read the receipt…")).to_be_visible()
     assert ExtractionJob.objects.count() == 1
+
+
+# ------------------------------------------------------------------ Sprint 2A closeout: returned editors stay dirty
+
+
+def _submit_invalid_confirm(page, project):
+    page.fill("#f-merchant", "Typed while reading")
+    page.fill("#f-date", "2026-09-27")
+    page.fill("#f-total", "99.00")  # does not match the items: the server returns the editor
+    page.fill("#l0-desc", "My own item")
+    page.fill("#l0-amt", "9.99")
+    page.select_option("#l0-a0-dest", f"project:{project.uuid}")
+    page.get_by_role("button", name="Confirm purchase").click()
+    expect(page.locator("#editor-errors")).to_be_visible()
+
+
+def _expect_typed_values(page, project):
+    expect(page.locator("#f-merchant")).to_have_value("Typed while reading")
+    expect(page.locator("#f-total")).to_have_value("99.00")
+    expect(page.locator("#l0-desc")).to_have_value("My own item")
+    expect(page.locator("#l0-amt")).to_have_value("9.99")
+    expect(page.locator("#l0-a0-dest")).to_have_value(f"project:{project.uuid}")
+
+
+def test_returned_editor_during_reading_is_never_reloaded(phone, live_server, owner, settings):
+    from apps.costs.models import Purchase
+    from apps.receipts import jobs
+    from apps.receipts.models import ReceiptDraft
+
+    project, draft = _start_reading(phone, live_server, owner, settings)
+    job, token = jobs.claim_next_job()  # the worker has the job: "processing"
+    _submit_invalid_confirm(phone, project)
+    # The returned page is a fresh load: it must start dirty without any further typing.
+    expect(phone.get_by_text("Reading the receipt…")).to_be_visible()
+    phone.evaluate("window.__noReload = true")
+    jobs.run_claimed_job(job, token)
+    assert ReceiptDraft.objects.get(pk=draft.pk).data["merchant"] == "Sample Hardware Co"  # stored reading
+    expect(phone.locator("[data-reading-done]")).to_be_visible(timeout=15000)
+    expect(phone.locator("[data-reading-dirty]")).to_be_visible()
+    phone.wait_for_timeout(1500)
+    assert phone.evaluate("window.__noReload === true")  # same document: no reload happened
+    _expect_typed_values(phone, project)
+    assert Purchase.objects.count() == 0 and overall_summary(owner).total == Decimal("0.00")
+    # Saving is deliberate: the draft changed, so the owner gets the recoverable conflict first.
+    phone.get_by_role("button", name="Save draft for later").click()
+    expect(phone.get_by_text("Not saved yet: this draft changed since you opened it")).to_be_visible()
+    _expect_typed_values(phone, project)
+    phone.get_by_role("button", name="Save draft (keep my version)").click()
+    expect(phone.get_by_text("Draft saved.")).to_be_visible()
+    assert ReceiptDraft.objects.get(pk=draft.pk).data["merchant"] == "Typed while reading"
+    assert Purchase.objects.count() == 0
+
+
+def test_returned_editor_blocks_retry_until_saved(phone, live_server, owner, settings):
+    from apps.receipts import jobs
+    from apps.receipts.extraction import ExtractionError, FakeExtractor
+    from apps.receipts.models import ExtractionJob
+
+    project, draft = _start_reading(phone, live_server, owner, settings)
+    FakeExtractor.queue.append(ExtractionError("refusal", "The provider declined to read this receipt."))
+    jobs.process_available()
+    phone.reload()
+    expect(phone.get_by_role("button", name="Try reading again")).to_be_visible()
+    expect(phone.locator("form[data-editor-form][data-dirty-on-load]")).to_have_count(0)  # GET: clean
+    _submit_invalid_confirm(phone, project)
+    phone.get_by_role("button", name="Try reading again").click()
+    expect(phone.get_by_text("You have unsaved changes.")).to_be_visible()
+    assert ExtractionJob.objects.count() == 1  # nothing new queued
+    _expect_typed_values(phone, project)
+    phone.get_by_role("button", name="Save draft for later").click()
+    expect(phone.get_by_text("Draft saved.")).to_be_visible()
+    phone.once("dialog", lambda d: d.accept())  # the reading would replace the saved values
+    phone.get_by_role("button", name="Try reading again").click()
+    expect(phone.get_by_text("Waiting to read the receipt…")).to_be_visible()
+    assert ExtractionJob.objects.count() == 2

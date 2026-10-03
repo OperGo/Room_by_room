@@ -18,7 +18,7 @@
 {% if duplicates %}<div class="alert alert-warning">{% icon "triangle-alert" 18 %}<div>This exact file was uploaded before{% for d in duplicates %}{% if d.draft %} (<a href="{% url 'receipts:review' d.draft.uuid %}">{{ d.created_at|date:"j M Y" }}</a>, {{ d.draft.get_review_status_display|lower }}){% endif %}{% endfor %}. Check you are not recording it twice.</div></div>{% endif %}
 {% include "includes/purchase_editor_alerts.html" %}
 
-<form method="post" action="{% url 'receipts:confirm' draft.uuid %}" class="review-grid" data-editor-form {% if save_conflict %}data-dirty-on-load{% endif %}>{% csrf_token %}
+<form method="post" action="{% url 'receipts:confirm' draft.uuid %}" class="review-grid" data-editor-form {% if editor_submitted %}data-dirty-on-load{% endif %}>{% csrf_token %}
   <input type="hidden" name="version" value="{{ version }}">
   <section class="ev" aria-label="Original receipt">
     <a class="ev-thumb" href="{% url 'receipts:file' document.uuid %}" target="_blank" rel="noopener" aria-label="Open the original receipt">

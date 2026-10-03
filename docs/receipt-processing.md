@@ -48,6 +48,9 @@ python manage.py process_receipts --once             # process what is claimable
 python manage.py process_receipts --once --max-jobs 1
 ```
 
+- `--watch` processes **one job per iteration** and checks for shutdown before every claim: on SIGTERM/Ctrl+C
+  the job in hand finishes, nothing new is claimed, and the worker exits without sleeping (idle waits are
+  sliced into 0.2 s steps). `--once` still processes everything claimable (or `--max-jobs`).
 - Claim: `SELECT … FOR UPDATE SKIP LOCKED` on the oldest claimable job, stamp a fresh `claim_token`,
   `attempts += 1`, lease `RECEIPT_LEASE_SECONDS` (180 s); **commit before calling the provider**.
 - Finish: re-lock the job; accept the result only if the claim token still matches. An attempt whose
@@ -87,6 +90,10 @@ python manage.py process_receipts --once --max-jobs 1
 
 - Any change on the page (typing, adding/removing items or adjustments, splits, the unitemised button) marks
   it as having unsaved changes; polling then never reloads it.
+- Any editor the server returns from a submission (validation errors, opening-balance choices, missing GBP
+  confirmation, duplicate warning, stale confirmation, save conflict) also starts with unsaved changes, so a
+  reading that finishes meanwhile never reloads it and Read/Retry stay blocked until a successful save. A normal
+  page load of stored values starts clean.
 - If a reading is stored while you edit, **Save draft** returns a conflict (HTTP 409) that keeps everything
   you entered and shows the current version; pressing **Save draft (keep my version)** saves it deliberately.
 - "Read receipt automatically" and "Try reading again" are blocked while there are unsaved changes ("Save draft

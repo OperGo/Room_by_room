@@ -72,7 +72,7 @@
   var formDirty = false;
   function markDirty() { formDirty = true; }
   document.querySelectorAll("form[data-editor-form]").forEach(function (form) {
-    if (form.hasAttribute("data-dirty-on-load")) markDirty();  // e.g. a returned save conflict
+    if (form.hasAttribute("data-dirty-on-load")) markDirty();  // any editor returned from a POST
     form.addEventListener("input", markDirty);
     form.addEventListener("change", markDirty);
   });

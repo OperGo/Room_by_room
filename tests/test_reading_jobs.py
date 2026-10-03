@@ -358,3 +358,146 @@ def test_save_conflict_after_reading_keeps_every_submitted_value(client_owner, o
     assert 'value="Typed by owner"' in page and 'value="My glue"' in page
     assert "then edited by you" in page and "Items match the receipt total" not in page
     assert_no_cost(owner)
+
+
+# ------------------------------------------------------------------ Sprint 2A closeout: worker shutdown
+
+
+def _two_queued_jobs(client_owner, owner, draft):
+    jobs.request_reading(owner, draft, draft.version)
+    client_owner.post(reverse("receipts:new"), {"receipt": upload("r2.jpg", image_bytes(color="red"))})
+    second = ReceiptDraft.objects.exclude(pk=draft.pk).get()
+    jobs.request_reading(owner, second, second.version)
+    return second
+
+
+@pytest.fixture
+def keep_test_connection(monkeypatch):
+    # The real worker closes stale connections each iteration; inside a test transaction that would
+    # close the test's own PostgreSQL connection, so it is stubbed here.
+    from apps.receipts.management.commands import process_receipts as command
+
+    monkeypatch.setattr(command, "close_old_connections", lambda: None)
+
+
+@pytest.fixture
+def restore_signals():
+    import signal
+
+    saved = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+    yield
+    for sig, handler in saved.items():
+        signal.signal(sig, handler)
+
+
+def test_watch_sigterm_finishes_current_job_and_leaves_next_queued(client_owner, owner, draft, restore_signals,
+                                                                     keep_test_connection, monkeypatch):
+    import os
+    import signal
+
+    from apps.receipts.extraction import ReceiptExtractionResult
+
+    second = _two_queued_jobs(client_owner, owner, draft)
+
+    def sigterm_mid_job(doc):
+        os.kill(os.getpid(), signal.SIGTERM)  # the platform asks the worker to stop during job one
+        return ReceiptExtractionResult(raw=copy.deepcopy(SAMPLE_RESULT), model_version="m", usage={})
+
+    FakeExtractor.queue.append(sigterm_mid_job)
+    slept = []
+    monkeypatch.setattr("time.sleep", lambda s: slept.append(s))
+    call_command("process_receipts", "--watch", "--interval", "30")
+    first_job = ExtractionJob.objects.get(draft=draft)
+    second_job = ExtractionJob.objects.get(draft=second)
+    assert first_job.status == "succeeded" and first_job.result_state == "applied"
+    assert second_job.status == "queued" and second_job.attempts == 0 and not second_job.claim_token
+    assert slept == []  # never sleeps once stopping
+    assert_no_cost(owner)
+    # The next worker run picks the queued job up normally.
+    assert jobs.process_available() == 1
+    assert ExtractionJob.objects.get(draft=second).status == "succeeded"
+
+
+def test_watch_processes_one_job_per_iteration_without_idle_sleep(client_owner, owner, draft, keep_test_connection,
+                                                                  monkeypatch):
+    second = _two_queued_jobs(client_owner, owner, draft)
+    from apps.receipts.management.commands import process_receipts as command
+
+    seen = []
+    real = command.process_available
+
+    def spy(max_jobs=None, now=None):
+        seen.append(max_jobs)
+        count = real(max_jobs=max_jobs, now=now)
+        if not count:
+            raise KeyboardInterrupt  # end the test loop at the first empty poll
+        return count
+
+    monkeypatch.setattr(command, "process_available", spy)
+    with pytest.raises(KeyboardInterrupt):
+        call_command("process_receipts", "--watch", "--interval", "30")
+    assert seen == [1, 1, 1]
+    assert {j.status for j in ExtractionJob.objects.filter(draft__in=[draft, second])} == {"succeeded"}
+
+
+def test_idle_wait_wakes_promptly_when_stopped(monkeypatch):
+    from apps.receipts.management.commands.process_receipts import Command
+
+    stop = {"flag": False}
+    slept = []
+
+    def fake_sleep(seconds):
+        slept.append(seconds)
+        stop["flag"] = True  # SIGTERM arrives during the idle wait
+
+    monkeypatch.setattr("time.sleep", fake_sleep)
+    Command._idle(30, stop)
+    assert slept == [0.2]  # short slices, so shutdown is never delayed by the full interval
+
+
+# ------------------------------------------------------------------ Sprint 2A closeout: returned editors stay dirty
+
+
+def _confirm_post(draft, office, **extra):
+    return {"version": str(draft.version), "merchant": "Typed by owner", "transaction_date": "2026-09-27",
+            "total": "12.00", "line-0-description": "My glue", "line-0-amount": "12.00",
+            "line-0-line_type": "item", "line-0-category": "material",
+            "line-0-alloc-0-dest": f"project:{office.uuid}", **extra}
+
+
+def test_every_returned_editor_starts_dirty_and_get_stays_clean(client_owner, owner, office, draft):
+    url = reverse("receipts:confirm", args=[draft.uuid])
+    page = client_owner.get(reverse("receipts:review", args=[draft.uuid])).content.decode()
+    assert "data-dirty-on-load" not in page  # stored values: clean
+    # 1. Validation failure (total does not match).
+    invalid = client_owner.post(url, _confirm_post(draft, office, total="99.00"))
+    # 2. Stale confirmation (old version).
+    stale = client_owner.post(url, _confirm_post(draft, office, version="0"))
+    assert stale.status_code == 409
+    # 3. GBP acknowledgement missing.
+    draft.data = {"extraction": {"gbp_confirmation_required": True}}
+    draft.save(update_fields=["data"])
+    gbp = client_owner.post(url, _confirm_post(draft, office))
+    draft.data = {}
+    draft.save(update_fields=["data"])
+    # 4. Possible duplicate needing acknowledgement.
+    from apps.costs import services as cost_services
+    from apps.costs.forms import PurchaseEditor
+
+    editor = PurchaseEditor(owner, _confirm_post(draft, office, transaction_date="2026-09-26"))
+    assert editor.is_valid(), editor.errors
+    cost_services.post_purchase(owner, editor.purchase_input)
+    duplicate = client_owner.post(url, _confirm_post(draft, office))
+    assert "This may duplicate a purchase" in duplicate.content.decode()
+    # 5. Opening-balance overlap needing a choice.
+    cost_services.create_opening_balance(owner, office, amount=Decimal("50.00"),
+                                         coverage_through=datetime.date(2026, 9, 30))
+    overlap = client_owner.post(url, _confirm_post(draft, office))
+    assert "This may already be in an opening balance" in overlap.content.decode()
+    assert invalid.status_code == 200 and 'id="editor-errors"' in invalid.content.decode()
+    for response in (invalid, stale, gbp, duplicate, overlap):
+        body = response.content.decode()
+        assert "data-dirty-on-load" in body and 'value="Typed by owner"' in body
+    assert "pounds sterling" in gbp.content.decode()
+    assert Purchase.objects.filter(source_draft=draft).count() == 0  # nothing confirmed by any redisplay
+    assert Purchase.objects.count() == 1  # only the deliberately seeded earlier purchase

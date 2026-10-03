@@ -39,10 +39,22 @@ class Command(BaseCommand):
         signal.signal(signal.SIGTERM, _stop)
         signal.signal(signal.SIGINT, _stop)
         self.stdout.write("Watching for receipt jobs. Press Ctrl+C to stop.")
+        # One job per iteration, and the stop flag is checked before every claim: on SIGTERM the
+        # job in hand finishes, nothing new is claimed and the worker never sleeps once stopping.
         while not stop["flag"]:
             close_old_connections()
-            count = process_available()
-            if count:
-                self.stdout.write(f"Processed {count} job(s).")
-            time.sleep(interval)
+            if process_available(max_jobs=1):
+                self.stdout.write("Processed 1 job(s).")
+                continue  # look for the next job straight away (after re-checking the flag)
+            self._idle(interval, stop)
         self.stdout.write("Stopped.")
+
+    @staticmethod
+    def _idle(interval, stop):
+        """Wait up to ``interval`` seconds between empty polls, waking promptly when asked to stop."""
+        deadline = time.monotonic() + interval
+        while not stop["flag"]:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(remaining, 0.2))

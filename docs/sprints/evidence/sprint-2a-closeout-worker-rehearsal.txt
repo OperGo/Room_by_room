@@ -1,0 +1,22 @@
+Sprint 2A closeout — receipt worker shutdown rehearsal (3 October 2026)
+Local PostgreSQL 16.14, fake extractor (synthetic results, no network, no paid calls),
+RECEIPT_FAKE_DELAY_SECONDS simulates provider latency. Real OS processes and signals.
+
+A. SIGTERM with two queued jobs (RECEIPT_FAKE_DELAY_SECONDS=6)
+   before:  job 1: status=queued attempts=0 | job 2: status=queued attempts=0
+   $ python manage.py process_receipts --watch --interval 3 &   ; sleep 2 ; kill -TERM <pid>
+   SIGTERM sent at +2.0 s (job 1 mid-reading)
+   worker exited rc=0, 4.5 s after SIGTERM        (= the rest of job 1's 6 s reading; no sleep, no new claim)
+   worker log: Using the FAKE test extractor: results are synthetic.
+               Watching for receipt jobs. Press Ctrl+C to stop.
+               Processed 1 job(s).
+               Stopped.
+   after:   job 1: status=succeeded attempts=1 result=applied
+            job 2: status=queued attempts=0 result=none   (left for the next worker)
+
+B. SIGKILL mid-reading, then lease expiry (RECEIPT_LEASE_SECONDS=12, delay 8 s)
+   SIGKILL at +3 s (job 2 mid-reading)       -> job 2: status=processing attempts=1
+   restart immediately, --once               -> Processed 0 job(s); job 2 still processing (lease held)
+   restart after lease expiry, --once        -> Processed 1 job(s); job 2: status=succeeded attempts=2 result=applied
+
+Confirmed purchases before and after: 3 (the demo account's seeded purchases) — readings create no cost.

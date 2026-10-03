@@ -19,8 +19,12 @@ Room by Room is a phone-first renovation organiser (Django). Read this before ch
 5. Always distinguish **mocked**, **automatically tested**, **visually inspected** and
    **live-provider-tested** behaviour. Never claim tests passed without running them.
 6. Major scope or architecture departures need a CTO decision, listed in the report.
-7. Commit meaningful checkpoints. Do not push, open PRs, deploy, or provision paid services
-   without an explicit instruction from the founder.
+7. Commit meaningful checkpoints. **Routine Git pushes** to the working branch on
+   OperGo/Room_by_room are authorised at the CTO's discretion (founder authorisation, relayed by the
+   CTO on 3 October 2026); no separate permission is needed before each push. Use normal pushes only
+   (no force-push or history rewriting) and verify the remote SHA matches local HEAD.
+   Opening PRs, merging, deploying, changing repository settings/visibility and provisioning paid
+   services still require an explicit founder instruction.
 
 ## Non-negotiables
 - Money: `Decimal`, GBP only for posted records, two decimals, inclusive prices, no tax maths, no FX.

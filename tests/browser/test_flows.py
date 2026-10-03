@@ -196,3 +196,48 @@ def test_keyboard_focus_is_visible(desktop, live_server, owner):
         desktop.keyboard.press("Tab")
     outline = desktop.evaluate("getComputedStyle(document.activeElement).outlineStyle")
     assert outline != "none"
+
+
+def _reading_draft(owner):
+    from apps.core.uploads import validate_receipt
+    from apps.receipts.services import store_receipt
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    project = Project.objects.create(owner=owner, title="Office")
+    buf = io.BytesIO()
+    Image.new("RGB", (300, 500), "white").save(buf, format="JPEG")
+    _, draft = store_receipt(owner, validate_receipt(SimpleUploadedFile("r.jpg", buf.getvalue())), "r.jpg")
+    return project, draft
+
+
+def test_phone_reading_polls_and_loads_result_when_untouched(phone, live_server, owner, settings):
+    from apps.receipts.jobs import process_available
+
+    settings.RECEIPT_EXTRACTOR = "fake"
+    project, draft = _reading_draft(owner)
+    sign_in(phone, live_server)
+    phone.goto(f"{live_server.url}/receipts/{draft.uuid}/")
+    expect(phone.get_by_text("nothing is sent to an AI provider")).to_be_visible()
+    phone.get_by_role("button", name="Read receipt automatically").click()
+    expect(phone.get_by_text("Waiting to read the receipt…")).to_be_visible()
+    process_available()
+    # Untouched form: the page reloads itself and shows the reading.
+    expect(phone.get_by_text("Synthetic test reading")).to_be_visible(timeout=15000)
+    expect(phone.locator("#f-merchant")).to_have_value("Sample Hardware Co")
+    expect(phone.locator("[data-reconcile-status]")).to_have_text("Choose a project for every item")
+
+
+def test_phone_polling_never_replaces_typed_values(phone, live_server, owner, settings):
+    from apps.receipts.jobs import process_available
+
+    settings.RECEIPT_EXTRACTOR = "fake"
+    project, draft = _reading_draft(owner)
+    sign_in(phone, live_server)
+    phone.goto(f"{live_server.url}/receipts/{draft.uuid}/")
+    phone.get_by_role("button", name="Read receipt automatically").click()
+    expect(phone.get_by_text("Waiting to read the receipt…")).to_be_visible()
+    phone.fill("#f-merchant", "Typed while reading")
+    process_available()
+    expect(phone.get_by_text("Reading finished.").first).to_be_visible(timeout=15000)
+    expect(phone.locator("#f-merchant")).to_have_value("Typed while reading")
+    expect(phone.locator("[data-reading-dirty]")).to_be_visible()

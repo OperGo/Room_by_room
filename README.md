@@ -3,8 +3,9 @@
 A phone-first organiser for home renovation: what is left to do, what do I need, and what has it cost?
 Django 5.2 LTS · Python 3.13 · server-rendered templates with small progressive JavaScript.
 
-Status: **Sprint 1 checkpoint** (see `docs/sprints/`). Automatic receipt extraction is not implemented yet
-(Sprint 2); receipts can be uploaded, kept privately and reviewed/entered manually.
+Status: **Sprint 2** (see `docs/sprints/`). Receipts can be uploaded, read automatically by the Anthropic
+API (when `ANTHROPIC_API_KEY` and `RECEIPT_MODEL` are configured), reviewed and confirmed. Live accuracy on
+real receipts has not been verified yet. See `docs/receipt-processing.md`.
 
 ## Local setup
 
@@ -24,7 +25,9 @@ python manage.py runserver 0.0.0.0:8000
 - `seed_demo` is idempotent: it never overwrites existing demo data unless `--reset` is passed, and it
   refuses to touch non-demo accounts. The real account starts empty.
 - There is no public signup and no Django admin.
-- Receipt worker: not applicable in Sprint 1 (Sprint 2 adds `python manage.py process_receipts --watch`).
+- Receipt worker (separate process, needed for automatic reading):
+  `python manage.py process_receipts --watch` (or `--once` from cron). Set `ANTHROPIC_API_KEY` and
+  `RECEIPT_MODEL=claude-haiku-4-5` in `.env`; without them the app says extraction is not configured.
 
 ## Tests
 
@@ -33,6 +36,7 @@ pytest                                                     # unit/integration on
 DATABASE_URL=postgres://... pytest                         # + PostgreSQL concurrency tests
 pytest tests/browser -o addopts="" -p no:cacheprovider     # Playwright (Chromium) browser suite
 python scripts/screenshots.py --password <demo password>   # regenerate docs/screenshots (server running)
+RECEIPT_EXTRACTOR=fake python scripts/screenshots_sprint2.py --password <demo password>  # synthetic reading states
 ```
 
 ## Layout

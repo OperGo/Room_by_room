@@ -59,3 +59,11 @@ filesystem class later (with short-lived signed URLs issued only after the owner
 `complete_task` blocks on any prerequisite that is not done — including cancelled ones (CTO decision,
 Sprint 1A) — unless the dependency is removed or an override note is recorded. `set_dependencies` rejects self-links, cross-project links and cycles and
 never alters completion history. "Ready" = open task in a planned/active project whose prerequisites are all done. Weekend selection stores the Saturday of the chosen weekend.
+
+## Receipt reading (Sprint 2)
+`apps/receipts/extraction.py` (adapter boundary, schema, prompt), `normalise.py` (server-side validation),
+`jobs.py` (request / claim / run / finish / apply), `management/commands/process_receipts.py` (worker).
+`ExtractionJob` holds the requested draft version, claim token, lease, bounded attempts, sanitised error,
+usage and the normalised result; a partial unique constraint keeps one active job per document and a
+check constraint bounds attempts. Jobs never write purchases; only `post_purchase` does, after the owner
+confirms. Details: `docs/receipt-processing.md`.

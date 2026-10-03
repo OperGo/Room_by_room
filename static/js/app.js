@@ -17,7 +17,7 @@
   // Confirmation prompts for destructive actions.
   document.addEventListener("submit", function (event) {
     var form = event.target;
-    var message = form.getAttribute("data-confirm");
+    var message = (event.submitter && event.submitter.getAttribute("data-confirm")) || form.getAttribute("data-confirm");
     if (message && !window.confirm(message)) {
       event.preventDefault();
       return;
@@ -52,7 +52,7 @@
     var linesBox = editor.querySelector("[data-lines]");
     var lineTemplate = form.querySelector("template[data-line-template]");
     var allocTemplate = form.querySelector("template[data-alloc-template]");
-    var totalInput = editor.querySelector("[data-total]");
+    var totalInput = form.querySelector("[data-total]");
 
     function nextIndex(selector, attr, root) {
       var max = -1;
@@ -79,24 +79,46 @@
     }
 
     function reconcile() {
-      var sum = 0, bad = false;
-      linesBox.querySelectorAll("[data-line-amount]").forEach(function (input) {
-        var p = parseMoney(input.value);
+      var linesSum = 0, allocated = 0, bad = false, unassigned = false;
+      linesBox.querySelectorAll("[data-line]").forEach(function (line) {
+        var p = parseMoney(line.querySelector("[data-line-amount]").value);
         if (p === null) return;
         if (isNaN(p)) { bad = true; return; }
-        sum += p;
+        linesSum += p;
+        var rows = line.querySelectorAll("[data-alloc]");
+        if (rows.length === 1) {
+          if (rows[0].querySelector("[data-alloc-dest]").value) allocated += p; else unassigned = true;
+        } else {
+          rows.forEach(function (row) {
+            var a = parseMoney(row.querySelector("[data-alloc-amount]").value);
+            if (row.querySelector("[data-alloc-dest]").value && a !== null && !isNaN(a)) allocated += a;
+            else unassigned = true;
+          });
+        }
       });
-      var out = editor.querySelector("[data-lines-sum]");
+      var text = editor.querySelector("[data-alloc-text]");
       var status = editor.querySelector("[data-reconcile-status]");
       var box = editor.querySelector("[data-reconcile]");
-      out.textContent = bad ? "check amounts" : formatPence(sum);
-      var total = parseMoney(totalInput.value);
       box.classList.remove("good", "bad");
-      if (total === null || bad) { status.textContent = total === null ? "Total will match the lines" : ""; return; }
-      if (isNaN(total)) { status.textContent = "Check the total"; box.classList.add("bad"); return; }
-      var diff = total - sum;
-      if (diff === 0) { status.textContent = "Matches total"; box.classList.add("good"); }
-      else { status.textContent = (diff > 0 ? formatPence(diff) + " not yet itemised" : formatPence(-diff) + " more than total"); box.classList.add("bad"); }
+      status.classList.remove("visually-hidden");
+      var total = totalInput ? parseMoney(totalInput.value) : null;
+      if (bad || (total !== null && isNaN(total))) {
+        text.textContent = "—"; status.textContent = "Check the amounts"; box.classList.add("bad"); return;
+      }
+      var target = total === null ? linesSum : total;
+      text.textContent = formatPence(allocated) + " of " + formatPence(target);
+      if (linesSum === 0 && target === 0) {
+        status.textContent = "Enter the item amounts"; return;
+      }
+      if (linesSum !== target) {
+        var diff = target - linesSum;
+        status.textContent = diff > 0 ? formatPence(diff) + " of the total is not itemised yet" : "Items are " + formatPence(-diff) + " more than the total";
+        box.classList.add("bad");
+      } else if (allocated !== target || unassigned) {
+        status.textContent = "Choose a project for every item"; box.classList.add("bad");
+      } else {
+        status.textContent = "Matches total"; status.classList.add("visually-hidden"); box.classList.add("good");
+      }
     }
 
     function addLine(type) {
@@ -106,6 +128,7 @@
       holder.innerHTML = html.trim();
       var line = holder.firstElementChild;
       if (type) {
+        line.querySelector("details.line-more").open = true;
         line.querySelector("[data-line-type]").value = type;
         line.querySelector("select[name$='-category']").value = "other";
         line.querySelector("input[name$='-description']").value = type === "discount" ? "Discount" : "Delivery";
@@ -140,14 +163,17 @@
         var row = holder.firstElementChild;
         allocs.appendChild(row);
         syncAllocs(line);
+        reconcile();
         row.querySelector("[data-alloc-dest]").focus();
       } else if (target.hasAttribute("data-remove-alloc")) {
         var lineEl = target.closest("[data-line]");
         target.closest("[data-alloc]").remove();
         syncAllocs(lineEl);
+        reconcile();
       }
     });
-    editor.addEventListener("input", reconcile);
+    form.addEventListener("input", reconcile);
+    form.addEventListener("change", reconcile);
     relabel();
     reconcile();
     var errors = document.getElementById("editor-errors");

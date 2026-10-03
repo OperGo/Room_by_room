@@ -8,6 +8,7 @@ the owner's real account is never touched.
 import datetime
 import io
 import secrets
+from pathlib import Path
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -26,38 +27,16 @@ from apps.shopping.models import ShoppingItem
 D = Decimal
 
 
-def sample_cabinetry_image():
-    """A drawn illustration (not a photograph) of built-in office cabinets."""
-    w, h = 1600, 1000
-    im = Image.new("RGB", (w, h), "#E9E3D6")
-    d = ImageDraw.Draw(im)
-    d.rectangle([0, 760, w, h], fill="#B89B74")  # floor
-    for x in range(0, w, 160):
-        d.line([x, 760, x - 60, h], fill="#A88B66", width=3)
-    d.rectangle([1120, 120, 1460, 520], fill="#F4F1EA", outline="#CFC6B4", width=8)  # window
-    d.line([1290, 120, 1290, 520], fill="#CFC6B4", width=6)
-    d.line([1120, 320, 1460, 320], fill="#CFC6B4", width=6)
-    # tall cabinets
-    green, edge = "#4E6F62", "#3C574C"
-    d.rectangle([140, 140, 520, 760], fill=green, outline=edge, width=6)
-    d.line([330, 140, 330, 760], fill=edge, width=5)
-    for x in (300, 360):
-        d.rounded_rectangle([x, 420, x + 10, 500], radius=4, fill="#D9C9A3")
-    # desk run + shelves
-    d.rectangle([520, 470, 1080, 500], fill="#C9A878", outline="#A8885D", width=4)
-    d.rectangle([520, 500, 640, 760], fill=green, outline=edge, width=6)
-    d.rectangle([960, 500, 1080, 760], fill=green, outline=edge, width=6)
-    for y in (200, 300):
-        d.rectangle([560, y, 1040, y + 16], fill="#C9A878")
-    for i, x in enumerate(range(580, 1000, 46)):
-        d.rectangle([x, 150 + (i % 3) * 8, x + 30, 200], fill=["#8E5C4A", "#3F5E7A", "#C29B48"][i % 3])
-    d.rectangle([0, 0, w, 60], fill="#202923")
-    d.text((24, 18), "SAMPLE IMAGE - illustration, not a photograph of a real home", fill="#F7F5F0")
-    out = io.BytesIO()
-    im.save(out, format="JPEG", quality=88)
-    content = out.getvalue()
+ASSETS = Path(__file__).resolve().parents[2] / "seed_assets"
+
+
+def sample_photo(name):
+    """Sample imagery cropped from the approved generated mockups. Not a photograph of a real home."""
     import hashlib
 
+    content = (ASSETS / name).read_bytes()
+    with Image.open(io.BytesIO(content)) as im:
+        w, h = im.size
     return ValidatedUpload(content=content, mime="image/jpeg", size=len(content),
                            checksum=hashlib.sha256(content).hexdigest(), width=w, height=h)
 
@@ -197,8 +176,10 @@ class Command(BaseCommand):
         for title in ("Remove old tiles", "Tile walls", "Grout and seal"):
             task(bathroom, title, None, "done")
 
-        project_services.add_photo(user, office, sample_cabinetry_image(),
-                                   caption="Sample image — illustrative cabinetry, not a real home", is_sample=True)
+        project_services.add_photo(user, office, sample_photo("sample-office.jpg"),
+                                   caption="Sample image (generated concept), not a real home", is_sample=True)
+        project_services.add_photo(user, hallway, sample_photo("sample-hallway.jpg"),
+                                   caption="Sample image (generated concept), not a real home", is_sample=True)
 
         cost_services.create_opening_balance(
             user, bathroom, amount=D("850.00"), coverage_through=datetime.date(2025, 6, 30),

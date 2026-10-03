@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from apps.core.dates import local_today
 from apps.core.exceptions import StaleObjectError
 from apps.core.shortcuts import parse_uuid, flash_errors, owned, safe_next
 from apps.projects.models import Project
@@ -41,6 +42,7 @@ def shopping_list(request):
     bought = sorted([i for i in items if i.is_bought], key=lambda i: i.purchased_at, reverse=True)
     return render(request, "shopping/list.html", {
         "groups": _group(to_buy, group_by),
+        "today": local_today(),
         "bought": bought[:50],
         "group_by": group_by,
         "to_buy_count": len(to_buy),

@@ -1,6 +1,6 @@
 ROOM BY ROOM — SPRINT 1 REPORT TO CHATGPT CTO
 Date: 3 October 2026
-Status: ready for review (visual fidelity against the approved mockups NOT yet checked — mockups were not attached)
+Status: ready for review (revised after a fidelity pass against the four approved mockups)
 
 1. OUTCOME
 The founder can sign in (single owner account, no signup), create projects (including older/completed ones with past dates), add tasks with estimates/due dates/dependencies, complete tasks (blocked tasks need an override note), plan tasks for "this weekend", upload/caption/delete project photos and choose a cover, keep a shopping list grouped by project or retailer with a Bought section, record manual purchases with itemised lines, shipping/discount/rounding adjustments and amount splits across projects / Shared tools / Unallocated, record refunds, correct or void purchases with reasons and history, add estimated opening balances with the covered-period overlap decision, and see project and overall cost totals with filters. Receipts (photo, image, HEIC, PDF) can be uploaded, are stored privately, and open a draft review screen beside the original where the owner enters the details manually, then confirms (exactly one purchase), attaches to an existing purchase (no new cost), saves the draft or discards it.
@@ -10,7 +10,7 @@ Not done / mocked: automatic receipt extraction does not exist yet (Sprint 2). T
 Delivered: everything listed in the brief's Sprint 1 scope: setup/auth/models, owner protections, project/task/photo workflows, dependencies, shopping list, manual purchases/allocations, opening balances, refunds/corrections/voids, cost views, Home/Project/Shopping screens, private receipt upload and draft review UI, seed command, docs (README, AGENTS.md, DESIGN.md, docs/architecture.md, docs/receipt-processing.md), tests and screenshots.
 Deferred/incomplete, with reasons:
 - Live extraction, job worker, UI polling, probable-duplicate (merchant/date/total) warnings: Sprint 2 per the brief. The interface (ReceiptExtractor / ReceiptExtractionResult) and ExtractionJob model already exist.
-- Mockup fidelity: the four approved images were not available in this session, so I could not compare against them.
+- Mockup fidelity: done after the first report, once the founder attached the four images. They are stored in docs/mockups/. Intentional differences are listed in DESIGN.md.
 - Home-screen install: a basic web manifest and icon only. No offline mode, as the brief requires.
 Departures from CTO brief, with reasons:
 - No Django admin installed. This avoids an owner-scoping bypass; the owner account is created with `manage.py create_owner`.
@@ -44,12 +44,20 @@ Checks actually run and results; distinguish SQLite/PostgreSQL/browser:
   - no horizontal scroll at 390px on 6 pages.
 - `manage.py check` clean. `check --deploy` gives only the expected local-DEBUG warnings. X_FRAME_OPTIONS is SAMEORIGIN on purpose so the receipt PDF preview can be framed.
 - Contrast for all text tokens is at least 4.5:1 (computed; listed in DESIGN.md).
+Mockup fidelity pass (after the founder attached the mockups): I compared Home, Project, Shopping and Receipt review at 390px with docs/mockups/*.png and restyled them to match:
+- header, wordmark and headline;
+- project cards, task cards with clock/tag metadata, and full-width primary actions;
+- bottom nav with a solid active icon;
+- the Spent/Budget panel and equal-width tabs;
+- shopping group bars and the collapsible Bought section;
+- the receipt header (thumbnail beside Merchant/Date/Total), item cards, the Allocated bar and Retake photo.
+The demo seed now uses sample photos cropped from the mockups, labelled as sample images. After the pass, all suites were re-run with the same results as below.
 Screens inspected and viewport widths: I looked at Home, Project (tasks), Shopping and Receipt review at 390px, and Home and Receipt review at 1440px. All 9 screens (home, projects, project, project-costs, shopping, costs, purchase, add-receipt, receipt-review) were captured at 390, 768 and 1440.
 - Fixed after inspection: task title and metadata running together; a stray "·" separator; the receipt image filling the whole phone screen; a clipped Total placeholder.
 Actual screenshots and how the founder can open them: docs/screenshots/*.png in the repository (e.g. docs/screenshots/home-390.png, project-390-full.png, receipt-review-1440.png). Regenerate with scripts/screenshots.py.
 Failed tests, untested behaviour and limitations:
 - No failing tests.
-- No comparison against the approved mockups (not provided).
+- I compared the screens with the approved mockups at 390px only; the mockups have no desktop or tablet views.
 - No physical iPhone testing. Camera capture and HEIC were tested only through emulated browser upload and synthetic HEIC files, which is not equivalent to a real iPhone.
 - 768px screens were captured but I did not review each one in detail.
 - No accessibility audit tool was run beyond labels, focus styles, tap sizes and the contrast checks.
@@ -104,7 +112,11 @@ Missing credentials or live validation explicitly outstanding: live extraction (
 
 7. RISKS / DECISIONS FOR CTO
 - Please confirm or override the departures in section 2: no admin, cancelled prerequisites not blocking, no negative destination within a purchase, blank Total defaulting to the line sum, manual confirmation of receipt drafts in Sprint 1.
-- The approved mockups must be attached to the Sprint 2 session so the screens can be compared with them. I make no fidelity claim until then.
+- Fidelity choices to confirm (see DESIGN.md "Intentional differences"):
+  - amounts keep pence instead of whole pounds;
+  - "Ready this weekend" appears only when tasks are planned, otherwise "Ready to start";
+  - receipt items use visible inputs instead of pencil icons;
+  - the "Spent" label is kept, with a note that it is confirmed cost, not payment.
 - Sprint 2 live validation needs the founder to supply an Anthropic API key (server-side, paid) and at least one real receipt.
 
 8. FOUNDER REVIEW

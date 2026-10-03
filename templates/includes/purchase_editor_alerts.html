@@ -1,0 +1,21 @@
+{% load rbr %}
+{% if editor.errors %}
+<div class="alert alert-error" role="alert" id="editor-errors" tabindex="-1">{% icon "triangle-alert" 18 %}
+  <div><strong>Nothing was recorded.</strong><ul>{% for e in editor.errors %}<li>{{ e }}</li>{% endfor %}</ul></div></div>
+{% endif %}
+
+{% if overlaps %}
+<section class="card card-pad stack" style="border-color:#EAD9B0;background:var(--ochre-tint);margin-bottom:16px" aria-labelledby="overlap-title">
+  <h2 id="overlap-title" style="font-size:17px">{% icon "triangle-alert" 18 %} This may already be in an opening balance</h2>
+  {% for o in overlaps %}
+  <fieldset style="border:0;padding:0;margin:0" class="stack">
+    <legend class="small"><strong>{{ o.balance.project.title }}</strong>: an estimate of {{ o.balance.amount|gbp }} covers spending up to {{ o.balance.coverage_through|date:"j M Y" }}{% if o.balance.note %} ({{ o.balance.note }}){% endif %}. This purchase puts {{ o.project_amount|gbp }} on that project.</legend>
+    <label class="check"><input type="radio" name="balance-{{ o.balance.uuid }}-decision" value="additional" required {% if o.choice.decision == "additional" %}checked{% endif %}><span>Additional spending — not part of the estimate</span></label>
+    <label class="check"><input type="radio" name="balance-{{ o.balance.uuid }}-decision" value="replace" {% if o.choice.decision == "replace" %}checked{% endif %}><span>Replaces part of the estimate — reduce the opening balance by:</span></label>
+    <div class="field" style="max-width:220px;margin-left:34px"><label class="visually-hidden" for="bal-{{ o.balance.uuid }}">Amount replaced</label>
+      <input type="text" inputmode="decimal" id="bal-{{ o.balance.uuid }}" name="balance-{{ o.balance.uuid }}-amount" value="{% if o.choice.amount %}{{ o.choice.amount }}{% endif %}" placeholder="0.00"></div>
+  </fieldset>
+  {% endfor %}
+</section>
+{% endif %}
+

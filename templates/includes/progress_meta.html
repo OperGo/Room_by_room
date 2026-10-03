@@ -1,0 +1,4 @@
+{% if progress.total %}
+<p class="meta">{{ progress.done }} of {{ progress.total }} tasks complete</p>
+<div class="progress" role="progressbar" aria-label="Task progress" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ progress.percent }}%"></span></div>
+{% else %}<p class="meta" style="margin-bottom:0">No tasks yet</p>{% endif %}

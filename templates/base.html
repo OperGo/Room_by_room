@@ -17,11 +17,11 @@
 <div class="app">
   {% if user.is_authenticated %}
   <nav class="side-nav" aria-label="Main">
-    <a class="brand" href="{% url 'core:home' %}"><span class="brand-mark">{% icon "layers" 20 %}</span>Room by Room</a>
+    <a class="brand" href="{% url 'core:home' %}"><span class="brand-mark">{% icon "layers" 20 %}</span><span class="wordmark" style="font-size:19px">Room by Room</span></a>
     <a class="nav-link" href="{% url 'core:home' %}" {% if nav_active == "home" %}aria-current="page"{% endif %}>{% icon "house" %}Home</a>
-    <a class="nav-link" href="{% url 'projects:list' %}" {% if nav_active == "projects" %}aria-current="page"{% endif %}>{% icon "folder-kanban" %}Projects</a>
-    <a class="nav-link" href="{% url 'shopping:list' %}" {% if nav_active == "shopping" %}aria-current="page"{% endif %}>{% icon "shopping-basket" %}Shopping</a>
-    <a class="nav-link" href="{% url 'costs:index' %}" {% if nav_active == "costs" %}aria-current="page"{% endif %}>{% icon "receipt-pound-sterling" %}Costs</a>
+    <a class="nav-link" href="{% url 'projects:list' %}" {% if nav_active == "projects" %}aria-current="page"{% endif %}>{% icon "file-text" %}Projects</a>
+    <a class="nav-link" href="{% url 'shopping:list' %}" {% if nav_active == "shopping" %}aria-current="page"{% endif %}>{% icon "shopping-cart" %}Shopping</a>
+    <a class="nav-link" href="{% url 'costs:index' %}" {% if nav_active == "costs" %}aria-current="page"{% endif %}>{% icon "chart-pie" %}Costs</a>
     <a class="btn side-cta" href="{% url 'receipts:new' %}">{% icon "camera" 18 %}Add receipt</a>
     <div class="side-foot">
       <p class="tiny muted" style="padding:0 12px">Signed in as {{ user.username }}{% if user.is_demo %} · <strong>demo data</strong>{% endif %}</p>
@@ -32,7 +32,7 @@
   </nav>
   {% endif %}
   <main class="main" id="content">
-    {% if user.is_demo %}<p class="badge badge-warning" style="margin-bottom:12px">Demo account · fictional sample data</p>{% endif %}
+    {% if user.is_demo %}<p style="margin:0 0 12px"><span class="badge badge-warning">Demo account · fictional sample data</span></p>{% endif %}
     {% if messages %}
     <div class="messages" role="status" aria-live="polite">
       {% for message in messages %}
@@ -46,10 +46,9 @@
   </main>
   {% if user.is_authenticated %}
   <nav class="bottom-nav" aria-label="Main">
-    <a href="{% url 'core:home' %}" {% if nav_active == "home" %}aria-current="page"{% endif %}><span class="nav-pill">{% icon "house" 22 %}</span>Home</a>
-    <a href="{% url 'projects:list' %}" {% if nav_active == "projects" %}aria-current="page"{% endif %}><span class="nav-pill">{% icon "folder-kanban" 22 %}</span>Projects</a>
-    <a href="{% url 'shopping:list' %}" {% if nav_active == "shopping" %}aria-current="page"{% endif %}><span class="nav-pill">{% icon "shopping-basket" 22 %}</span>Shopping</a>
-    <a href="{% url 'costs:index' %}" {% if nav_active == "costs" %}aria-current="page"{% endif %}><span class="nav-pill">{% icon "receipt-pound-sterling" 22 %}</span>Costs</a>
+    {% for key, url_name, label, ic in nav_items %}
+    <a href="{% url url_name %}" {% if nav_active == key %}aria-current="page"{% endif %}><span class="nav-pill"><span class="line">{% icon ic 26 %}</span><span class="solid">{% icon ic|add:"-solid" 26 %}</span></span>{{ label }}</a>
+    {% endfor %}
   </nav>
   {% endif %}
 </div>

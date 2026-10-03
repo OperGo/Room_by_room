@@ -149,6 +149,9 @@ def receipt_discard(request, uuid):
     except BusinessRuleError as exc:
         flash_errors(request, exc)
         return redirect("receipts:review", uuid=uuid)
+    if request.GET.get("retake"):
+        messages.info(request, "Previous photo discarded. Nothing was recorded.")
+        return redirect("receipts:new")
     messages.success(request, "Draft discarded. The file is kept privately with no cost recorded.")
     return redirect("costs:index")
 

@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_not_required
+from django.db.models import F, Max
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.templatetags.static import static
@@ -16,7 +17,8 @@ def home(request):
         Project.objects.for_owner(owner)
         .filter(status__in=[Project.Status.ACTIVE, Project.Status.PLANNED])
         .select_related("cover_photo")
-        .order_by("status", "-updated_at")
+        .annotate(last_activity=Max("tasks__completed_at"))
+        .order_by("status", F("last_activity").desc(nulls_last=True), "-updated_at")
     )
     costs = project_net_costs(owner, projects)
     for project in projects:
@@ -27,7 +29,7 @@ def home(request):
     saturday = this_weekend_saturday()
     ready = list(ready_tasks(owner)[:40])
     weekend = [t for t in ready if t.weekend_date == saturday]
-    rest = [t for t in ready if t.weekend_date != saturday][:8]
+    rest = [t for t in ready if t.weekend_date != saturday][:5]
     drafts = ReceiptDraft.objects.for_owner(owner).filter(review_status=ReceiptDraft.ReviewStatus.DRAFT).count()
     return render(request, "core/home.html", {
         "today": local_today(),

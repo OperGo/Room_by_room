@@ -9,4 +9,13 @@ def navigation(request):
         "costs": "costs",
         "receipts": "costs",
     }.get(namespace, "")
-    return {"nav_active": active, "nav_url_name": url_name}
+    return {
+        "nav_active": active,
+        "nav_url_name": url_name,
+        "nav_items": [
+            ("home", "core:home", "Home", "house"),
+            ("projects", "projects:list", "Projects", "file-text"),
+            ("shopping", "shopping:list", "Shopping", "shopping-cart"),
+            ("costs", "costs:index", "Costs", "chart-pie"),
+        ],
+    }

@@ -230,8 +230,10 @@ class PurchaseEditor:
         self.errors = errors
         if errors:
             return False
+        description = self.header["description"] or self.header["merchant"] or (
+            line_inputs[0].description if line_inputs else "") or "Purchase"
         self.purchase_input = PurchaseInput(
-            description=self.header["description"], merchant=self.header["merchant"],
+            description=description, merchant=self.header["merchant"],
             transaction_date=transaction_date, total=total, notes=self.header["notes"], lines=line_inputs,
         )
         return True

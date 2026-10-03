@@ -212,7 +212,7 @@ def test_home_shows_ready_tasks_and_featured_project(client_owner, owner):
     response = client_owner.get(reverse("core:home"))
     assert b"Office cabinetry" in response.content
     assert b"Ready to start" in response.content and b"Fill and sand joints" in response.content
-    assert b"0 of 1 tasks done" in response.content
+    assert b"0 of 1 tasks complete" in response.content
 
 
 def test_weekend_selection(client_owner, owner):

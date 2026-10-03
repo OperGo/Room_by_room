@@ -1,31 +1,30 @@
 {% load rbr %}
-<ul class="list card">
+<ul class="task-cards">
   {% for task in tasks %}
-  <li class="row" style="padding-left:12px">
+  <li class="task-card {% if task.status == 'done' %}is-done{% endif %}">
     {% if task.status == "done" %}
-      <span class="task-check done" aria-hidden="true"><span class="ring">{% icon "check" 16 %}</span></span>
+      <span class="task-check done" role="img" aria-label="Done"><span class="ring">{% icon "check" 16 %}</span></span>
     {% elif task.waiting_on %}
-      <span class="task-check" title="Waiting on another task"><span class="ring">{% icon "lock" 12 %}</span><span class="visually-hidden">Blocked</span></span>
+      <span class="task-check locked" role="img" aria-label="Blocked: waiting on another task"><span class="ring">{% icon "lock" 12 %}</span></span>
     {% else %}
     <form method="post" action="{% url 'projects:task_complete' task.uuid %}">{% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       <button class="task-check" type="submit" aria-label="Mark “{{ task.title }}” done"><span class="ring"></span></button>
     </form>
     {% endif %}
-    <a class="row-main" href="{% url 'projects:task_detail' task.uuid %}" style="color:inherit;text-decoration:none">
-      <span class="row-title">{{ task.title }}</span>
-      <span class="row-meta">{% spaceless %}
-        {% if show_project %}<span>{{ task.project.title }}</span>{% endif %}
-        {% if task.status == "in_progress" %}<span class="dot-sep">In progress</span>{% endif %}
-        {% if task.estimated_minutes %}<span class="dot-sep">{{ task.estimated_minutes|minutes }}</span>{% endif %}
-        {% if task.due_date %}<span class="dot-sep">due {{ task.due_date|date:"j M" }}</span>{% endif %}
-        {% endspaceless %}
-        {% if task.waiting_on %}<br><span class="badge badge-warning">{% icon "lock" 12 %}Waiting on {{ task.waiting_on|join:", " }}</span>{% endif %}
-        {% if task.done_before_prereq %}<br><span class="badge badge-outline">Completed before {{ task.waiting_on|join:", " }}</span>{% endif %}
-        {% if task.completion_override_note %}<br><span class="badge badge-outline">Completed with override</span>{% endif %}
+    <a class="tc-main" href="{% url 'projects:task_detail' task.uuid %}">
+      <span class="tc-title">{{ task.title }}</span>
+      <span class="tc-meta">
+        {% if task.waiting_on and task.status != "done" %}<span>{% icon "clock" 18 %}After {{ task.waiting_on.0.title|lower }}</span>
+        {% elif task.estimated_minutes %}<span>{% icon "clock" 18 %}{{ task.estimated_minutes|minutes }}</span>{% endif %}
+        <span>{% icon "tag" 18 %}{% if show_project %}{{ task.project.room|default:task.project.title }}{% else %}{{ task.project.room|default:task.project.title }}{% endif %}</span>
+        {% if task.status == "in_progress" %}<span class="badge">In progress</span>{% endif %}
+        {% if task.due_date and task.is_open %}<span>{% icon "calendar" 18 %}Due {{ task.due_date|date:"j M" }}</span>{% endif %}
+        {% if task.weekend_date == saturday and task.is_open and not hide_weekend %}<span class="badge">This weekend</span>{% endif %}
+        {% if task.done_before_prereq or task.completion_override_note %}<span class="badge badge-outline">Completed early</span>{% endif %}
       </span>
     </a>
-    {% if task.weekend_date == saturday and task.is_open %}<span class="badge">This weekend</span>{% endif %}
+    <span class="tc-chev" aria-hidden="true">{% icon "chevron-right" 22 %}</span>
   </li>
   {% endfor %}
 </ul>

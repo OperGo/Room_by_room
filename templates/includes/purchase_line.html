@@ -1,30 +1,38 @@
 {% load rbr %}
-<div class="editor-line" data-line data-index="{{ i }}">
-  <div class="editor-line-head"><span class="label" data-line-label>Line</span>
-    <button type="button" class="icon-btn" data-remove-line aria-label="Remove line">{% icon "x" 18 %}</button></div>
+<div class="line-card" data-line data-index="{{ i }}">
+  <span class="visually-hidden" data-line-label>Line</span>
   <input type="hidden" name="line-{{ i }}-shopping" value="{{ line.shopping|default:'' }}">
-  <div class="editor-grid">
-    <div class="field desc wide"><label for="l{{ i }}-desc" class="mini-label">Item</label>
-      <input type="text" id="l{{ i }}-desc" name="line-{{ i }}-description" value="{{ line.description|default:'' }}" maxlength="160" placeholder="e.g. 18mm MDF sheet"></div>
-    <div class="field"><label for="l{{ i }}-type" class="mini-label">Type</label>
-      <select id="l{{ i }}-type" name="line-{{ i }}-line_type" data-line-type>
-        {% for value, label in line_types %}<option value="{{ value }}" {% if line.line_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select></div>
-    <div class="field"><label for="l{{ i }}-cat" class="mini-label">Category</label>
-      <select id="l{{ i }}-cat" name="line-{{ i }}-category">
-        {% for value, label in categories %}<option value="{{ value }}" {% if line.category == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select></div>
-    <div class="field"><label for="l{{ i }}-qty" class="mini-label">Qty</label>
-      <input type="text" inputmode="decimal" id="l{{ i }}-qty" name="line-{{ i }}-quantity" value="{{ line.quantity|default:'1' }}"></div>
-    <div class="field"><label for="l{{ i }}-unit" class="mini-label">Unit price <span class="muted">(optional)</span></label>
-      <input type="text" inputmode="decimal" id="l{{ i }}-unit" name="line-{{ i }}-unit_price" value="{{ line.unit_price|default:'' }}"></div>
-    <div class="field"><label for="l{{ i }}-amt" class="mini-label">Line total £</label>
-      <input type="text" inputmode="decimal" id="l{{ i }}-amt" name="line-{{ i }}-amount" value="{{ line.amount|default:'' }}" data-line-amount placeholder="0.00"></div>
+  <div class="line-top">
+    <label class="visually-hidden" for="l{{ i }}-desc">Item description</label>
+    <input type="text" id="l{{ i }}-desc" name="line-{{ i }}-description" value="{{ line.description|default:'' }}" maxlength="160" placeholder="Item, e.g. MDF sheet">
+    <label class="visually-hidden" for="l{{ i }}-amt">Line total in pounds</label>
+    <input class="amount-input" type="text" inputmode="decimal" id="l{{ i }}-amt" name="line-{{ i }}-amount" value="{{ line.amount|default:'' }}" data-line-amount placeholder="£0.00">
   </div>
   <div class="alloc-list" data-allocs>
-    <span class="mini-label">Belongs to</span>
     {% if line %}{% for a in line.allocations %}{% with j=forloop.counter0 %}{% include "includes/purchase_alloc.html" with single=line.allocations|length_is_one %}{% endwith %}{% endfor %}
     {% else %}{% with j=0 a=None %}{% include "includes/purchase_alloc.html" with single=True %}{% endwith %}{% endif %}
   </div>
-  <div><button type="button" class="btn btn-ghost btn-sm" data-split>{% icon "split" 16 %}Split between projects</button></div>
+  <details class="line-more" {% if line.line_type and line.line_type != "item" or line.unit_price or line.allocations|length > 1 %}open{% endif %}>
+    <summary>{% icon "chevron-down" 16 %}Type, quantity or split</summary>
+    <div class="line-more-body">
+      <div class="editor-grid">
+        <div class="field"><label for="l{{ i }}-type" class="mini-label">Type</label>
+          <select id="l{{ i }}-type" name="line-{{ i }}-line_type" data-line-type>
+            {% for value, label in line_types %}<option value="{{ value }}" {% if line.line_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select></div>
+        <div class="field"><label for="l{{ i }}-cat" class="mini-label">Category</label>
+          <select id="l{{ i }}-cat" name="line-{{ i }}-category">
+            {% for value, label in categories %}<option value="{{ value }}" {% if line.category == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select></div>
+        <div class="field"><label for="l{{ i }}-qty" class="mini-label">Quantity</label>
+          <input type="text" inputmode="decimal" id="l{{ i }}-qty" name="line-{{ i }}-quantity" value="{{ line.quantity|default:'1' }}"></div>
+        <div class="field"><label for="l{{ i }}-unit" class="mini-label">Unit price (optional)</label>
+          <input type="text" inputmode="decimal" id="l{{ i }}-unit" name="line-{{ i }}-unit_price" value="{{ line.unit_price|default:'' }}"></div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost btn-sm" data-split>{% icon "split" 16 %}Split between projects</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-remove-line>{% icon "trash-2" 16 %}Remove item</button>
+      </div>
+    </div>
+  </details>
 </div>

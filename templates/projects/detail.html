@@ -1,17 +1,18 @@
 {% extends "base.html" %}{% load rbr %}
 {% block title %}{{ project.title }}{% endblock %}
 {% block content %}
-<header class="topbar">
-  {% url 'projects:list' as back %}{% include "includes/back.html" with href=back label="projects" %}
-  <div class="topbar-title">
-    <p class="eyebrow">{% if project.room %}{{ project.room }} · {% endif %}<span class="badge {% if project.status == 'completed' %}badge-done{% elif project.status == 'archived' %}badge-muted{% elif project.status == 'planned' %}badge-outline{% endif %}">{{ project.get_status_display }}</span></p>
-    <h1>{{ project.title }}</h1>
+<a class="back-link" href="{% url 'projects:list' %}">{% icon "chevron-left" 24 %}Projects</a>
+<header class="page-head">
+  <div class="title-row" style="align-items:flex-start">
+    <h1 class="page-title">{{ project.title }}</h1>
+    <a class="icon-btn" href="{% url 'projects:edit' project.uuid %}" aria-label="Edit project">{% icon "pencil" 20 %}</a>
   </div>
-  <a class="icon-btn" href="{% url 'projects:edit' project.uuid %}" aria-label="Edit project">{% icon "pencil" 20 %}</a>
+  {% if project.status != "active" or project.room %}<p class="small muted" style="margin:2px 0 0">{% if project.room %}{{ project.room }}{% endif %}{% if project.status != "active" %}{% if project.room %} · {% endif %}<span class="badge {% if project.status == 'completed' %}badge-done{% elif project.status == 'archived' %}badge-muted{% else %}badge-outline{% endif %}">{{ project.get_status_display }}</span>{% endif %}</p>{% endif %}
+  {% include "includes/progress_meta.html" %}
 </header>
 
-<div class="split-2 split-wide">
-  <div class="card hero-card">
+<div class="split-2">
+  <div class="card hero-card" style="border-radius:16px">
     <div class="hero-photo">
       {% if project.cover_photo %}
         <img src="{% url 'projects:photo_file' project.cover_photo.uuid %}" alt="{{ project.cover_photo.caption|default:project.title }}">
@@ -23,46 +24,37 @@
     </div>
   </div>
   <div class="stack">
-    <div class="stat">
-      <div class="kv"><span class="stat-label">Task progress</span><span class="small muted">{% if progress.total %}{{ progress.percent }}%{% endif %}</span></div>
-      {% if progress.total %}
-        <div class="stat-value">{{ progress.done }} <span class="small muted" style="font-weight:500">of {{ progress.total }} tasks done</span></div>
-        <div class="progress" style="margin-top:8px" role="progressbar" aria-label="Task progress" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ progress.percent }}%"></span></div>
-      {% else %}<div class="stat-value" style="font-size:18px">No tasks yet</div>{% endif %}
+    <div class="spend-panel">
+      <div><div class="spend-label">Spent</div><div class="spend-value money">{{ summary.net|gbp }}</div>
+        {% if summary.opening %}<div class="spend-note">incl. {{ summary.opening|gbp }} estimate</div>{% endif %}</div>
+      <div><div class="spend-label">Budget</div><div class="spend-value money">{% if summary.budget is not None %}{{ summary.budget|gbp }}{% else %}—{% endif %}</div>
+        {% if summary.budget_remaining is not None %}<div class="spend-note {% if summary.over_budget %}over{% endif %}">{% if summary.over_budget %}{{ summary.budget_remaining|gbp }} over{% else %}{{ summary.budget_remaining|gbp }} left{% endif %}</div>{% endif %}</div>
     </div>
-    <div class="stat-row">
-      <div class="stat"><div class="stat-label">Recorded cost</div><div class="stat-value money">{{ summary.net|gbp }}</div>
-        {% if summary.opening %}<div class="stat-note">incl. {{ summary.opening|gbp }} estimate</div>{% endif %}</div>
-      <div class="stat"><div class="stat-label">Budget</div><div class="stat-value money">{% if summary.budget is not None %}{{ summary.budget|gbp }}{% else %}—{% endif %}</div>
-        {% if summary.budget_remaining is not None %}<div class="stat-note {% if summary.over_budget %}over{% endif %}">{% if summary.over_budget %}{{ summary.budget_remaining|gbp }} over budget{% else %}{{ summary.budget_remaining|gbp }} remaining{% endif %}</div>{% endif %}</div>
-    </div>
-    {% if summary.budget %}<div class="progress {% if summary.over_budget %}progress-over{% endif %}" role="progressbar" aria-label="Budget used" aria-valuenow="{{ summary.budget_percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ summary.budget_percent }}%"></span></div>
-    <p class="tiny muted" style="margin:0">Spending is not progress: the bar shows budget used, not work done.</p>{% endif %}
+    <p class="tiny muted" style="margin:0">Spent is the cost you have confirmed (purchases and estimates minus refunds), not proof of payment.</p>
   </div>
 </div>
 
-<nav class="tabs" aria-label="Project sections">
-  <a href="?tab=tasks" {% if tab == "tasks" %}aria-current="page"{% endif %}>{% icon "list-checks" 18 %}Tasks <span class="tab-count">{{ open_tasks|length }}</span></a>
-  <a href="?tab=costs" {% if tab == "costs" %}aria-current="page"{% endif %}>{% icon "receipt-pound-sterling" 18 %}Costs</a>
-  <a href="?tab=photos" {% if tab == "photos" %}aria-current="page"{% endif %}>{% icon "image" 18 %}Photos</a>
+<nav class="tabs equal" aria-label="Project sections">
+  <a href="?tab=tasks" {% if tab == "tasks" %}aria-current="page"{% endif %}>Tasks</a>
+  <a href="?tab=costs" {% if tab == "costs" %}aria-current="page"{% endif %}>Costs</a>
+  <a href="?tab=photos" {% if tab == "photos" %}aria-current="page"{% endif %}>Photos</a>
 </nav>
 
 {% if tab == "tasks" %}
-  <div class="section-head"><h2>To do</h2><a class="btn btn-sm" href="{% url 'projects:task_create' project.uuid %}">{% icon "plus" 16 %}Add task</a></div>
+  <h2 class="section-h">Next steps</h2>
   {% if open_tasks %}{% include "includes/task_rows.html" with tasks=open_tasks %}
   {% else %}<div class="card empty small">{% if done_tasks %}Every task is done.{% else %}No tasks yet. Add the jobs left in this room.{% endif %}</div>{% endif %}
-  <div class="btn-row" style="margin-top:12px">
-    <a class="btn btn-secondary btn-sm" href="{% url 'shopping:create' %}?project={{ project.uuid }}">{% icon "shopping-basket" 16 %}Add shopping item</a>
-  </div>
   {% if done_tasks %}
-  <section class="section"><div class="section-head"><h2>Done</h2><span class="small muted">{{ done_tasks|length }}</span></div>
-    {% include "includes/task_rows.html" with tasks=done_tasks %}</section>
+  <details class="disclosure" style="margin-top:12px" {% if not open_tasks %}open{% endif %}><summary>{% icon "chevron-down" 18 %}Completed ({{ done_tasks|length }})</summary>
+    {% include "includes/task_rows.html" with tasks=done_tasks %}</details>
   {% endif %}
   {% if cancelled_tasks %}
-  <details class="disclosure section"><summary>{% icon "chevron-down" 18 %}Cancelled ({{ cancelled_tasks|length }})</summary>
+  <details class="disclosure"><summary>{% icon "chevron-down" 18 %}Cancelled ({{ cancelled_tasks|length }})</summary>
     <ul class="list card">{% for t in cancelled_tasks %}<li><a class="row" href="{% url 'projects:task_detail' t.uuid %}"><span class="row-main"><span class="row-title muted">{{ t.title }}</span></span><span class="badge badge-muted">Cancelled</span></a></li>{% endfor %}</ul>
   </details>
   {% endif %}
+  <p style="margin-top:12px"><a class="btn btn-secondary btn-sm" href="{% url 'shopping:create' %}?project={{ project.uuid }}">{% icon "shopping-cart" 16 %}Add shopping item</a></p>
+  <div class="sticky-cta"><a class="btn btn-wide" href="{% url 'projects:task_create' project.uuid %}">{% icon "circle-plus" 24 %}Add a task</a></div>
 {% elif tab == "costs" %}
   <div class="split-2">
     <div class="card card-pad">

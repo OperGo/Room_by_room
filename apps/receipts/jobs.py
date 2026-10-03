@@ -174,7 +174,9 @@ def run_claimed_job(job, token, today=None):
         return finish_failure(job.pk, token, ExtractionError("internal", "Reading failed unexpectedly."))
     try:
         data = normalise(result.raw, today=today or timezone.localdate())
-    except NormaliseError:
+    except Exception as exc:  # noqa: BLE001 - deterministic bad output: never retried, never logged raw
+        if not isinstance(exc, NormaliseError):
+            logger.error("Receipt job %s: normalisation raised %s", job.pk, type(exc).__name__)
         error = ExtractionError("malformed", "The reading service returned an unusable result.")
         error.usage = result.usage
         return finish_failure(job.pk, token, error)
@@ -189,7 +191,14 @@ def process_available(max_jobs=None, now=None):
         if claimed is None:
             break
         job, token = claimed
-        run_claimed_job(job, token)
+        try:
+            run_claimed_job(job, token)
+        except Exception as exc:  # noqa: BLE001 - one bad job must not stop the worker
+            logger.error("Receipt job %s crashed with %s", job.pk, type(exc).__name__)
+            try:
+                finish_failure(job.pk, token, ExtractionError("internal", "Reading failed unexpectedly."))
+            except Exception:  # noqa: BLE001 - lease expiry will recover it
+                logger.error("Receipt job %s could not be marked failed", job.pk)
         processed += 1
     return processed
 

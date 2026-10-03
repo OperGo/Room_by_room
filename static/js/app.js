@@ -17,6 +17,13 @@
   // Confirmation prompts for destructive actions.
   document.addEventListener("submit", function (event) {
     var form = event.target;
+    if (form.hasAttribute("data-requires-saved") && formDirty) {
+      // Reading requests are separate forms: never let them silently drop unsaved editor values.
+      event.preventDefault();
+      var note = form.querySelector("[data-unsaved-note]");
+      if (note) { note.hidden = false; note.focus(); }
+      return;
+    }
     var message = (event.submitter && event.submitter.getAttribute("data-confirm")) || form.getAttribute("data-confirm");
     if (message && !window.confirm(message)) {
       event.preventDefault();
@@ -61,11 +68,13 @@
     });
   });
 
-  // Track unsaved typing so polling never discards it.
+  // Track unsaved changes (typing, structural edits, programmatic fills) so nothing discards them.
   var formDirty = false;
+  function markDirty() { formDirty = true; }
   document.querySelectorAll("form[data-editor-form]").forEach(function (form) {
-    form.addEventListener("input", function () { formDirty = true; });
-    form.addEventListener("change", function () { formDirty = true; });
+    if (form.hasAttribute("data-dirty-on-load")) markDirty();  // e.g. a returned save conflict
+    form.addEventListener("input", markDirty);
+    form.addEventListener("change", markDirty);
   });
 
   // Receipt reading status: poll the job only; never touch form values.
@@ -105,7 +114,11 @@
     window.setTimeout(tick, 2000);
   });
   document.querySelectorAll("[data-reading-reload]").forEach(function (link) {
-    link.addEventListener("click", function (event) { event.preventDefault(); window.location.reload(); });
+    link.addEventListener("click", function (event) {
+      event.preventDefault();
+      if (formDirty && !window.confirm("Show the stored reading? This reloads the page and replaces the changes you made here. To keep your changes, press Save draft instead.")) return;
+      window.location.reload();
+    });
   });
 
   // "Use one unitemised line": an explicit owner action, never automatic.
@@ -118,6 +131,7 @@
       line.querySelector("[data-line-type]").value = "unitemised";
       line.querySelector("select[name$='-category']").value = "other";
       line.querySelector("[data-line-amount]").value = button.getAttribute("data-unitemised");
+      markDirty();
       line.querySelector("input[name$='-description']").dispatchEvent(new Event("input", { bubbles: true }));
     });
   });
@@ -223,6 +237,7 @@
     editor.addEventListener("click", function (event) {
       var target = event.target.closest("button");
       if (!target) return;
+      if (target.matches("[data-add-line], [data-add-adjustment], [data-remove-line], [data-split], [data-remove-alloc]")) markDirty();
       if (target.hasAttribute("data-add-line")) { addLine(); }
       else if (target.hasAttribute("data-add-adjustment")) { addLine("shipping"); }
       else if (target.hasAttribute("data-remove-line")) {

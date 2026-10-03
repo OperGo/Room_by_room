@@ -271,3 +271,88 @@ def test_worker_command_modes(owner, draft):
     assert ExtractionJob.objects.get().status == "succeeded"
     with pytest.raises(Exception):
         call_command("process_receipts")  # a mode is required
+
+
+# ------------------------------------------------------------------ Sprint 2A: malformed output containment
+
+
+@pytest.mark.parametrize("patch", [
+    {"uncertain_fields": [{}]}, {"warnings": 1},
+    {"items": [{"description": "x", "quantity": None, "line_total": "1.00", "uncertain": False}, ["nested"]]},
+])
+def test_malformed_output_fails_cleanly_and_next_job_runs(client_owner, owner, draft, patch):
+    from apps.receipts.extraction import ReceiptExtractionResult
+
+    bad = copy.deepcopy(SAMPLE_RESULT)
+    bad.update(patch)
+    FakeExtractor.queue.append(lambda doc: ReceiptExtractionResult(
+        raw=bad, model_version="m", usage={"input_tokens": 900, "output_tokens": 50}))
+    jobs.request_reading(owner, draft, draft.version)
+    # A second receipt queued behind the bad one, processed in the same worker run.
+    client_owner.post(reverse("receipts:new"), {"receipt": upload("r2.jpg", image_bytes(color="red"))})
+    second = ReceiptDraft.objects.exclude(pk=draft.pk).get()
+    jobs.request_reading(owner, second, second.version)
+    assert jobs.process_available() == 2
+    first_job = ExtractionJob.objects.get(draft=draft)
+    second_job = ExtractionJob.objects.get(draft=second)
+    draft.refresh_from_db()
+    if "items" in patch:
+        # A nested malformed row is skipped: the reading is applied but marked incomplete.
+        assert first_job.status == "succeeded" and draft.data["extraction"]["incomplete"] is True
+        assert draft.data["extraction"]["reconciled"] is False
+    else:
+        assert first_job.status == "failed" and first_job.error_code == "malformed" and first_job.attempts == 1
+        assert first_job.usage["input_tokens"] == 900  # usage retained
+        assert draft.data == {} and draft.version == 1  # draft untouched
+    assert second_job.status == "succeeded"
+    assert_no_cost(owner)
+
+
+def test_unexpected_crash_in_one_job_does_not_stop_the_worker(owner, draft, client_owner, monkeypatch):
+    calls = {"n": 0}
+    real = jobs.finish_success
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("database hiccup")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(jobs, "finish_success", flaky)
+    jobs.request_reading(owner, draft, draft.version)
+    client_owner.post(reverse("receipts:new"), {"receipt": upload("r2.jpg", image_bytes(color="red"))})
+    second = ReceiptDraft.objects.exclude(pk=draft.pk).get()
+    jobs.request_reading(owner, second, second.version)
+    assert jobs.process_available() == 2
+    assert ExtractionJob.objects.get(draft=draft).status == "failed"
+    assert ExtractionJob.objects.get(draft=second).status == "succeeded"
+
+
+def test_save_conflict_after_reading_keeps_every_submitted_value(client_owner, owner, office, hallway, draft):
+    jobs.request_reading(owner, draft, draft.version)
+    jobs.process_available()  # reading applied: stored draft is now version 2
+    draft.refresh_from_db()
+    assert draft.version == 2
+    mine = {"version": "1", "merchant": "Typed by owner", "transaction_date": "2026-09-27", "total": "12.00",
+            "line-0-description": "My glue", "line-0-amount": "12.00", "line-0-flag": "1",
+            "line-0-alloc-0-dest": f"project:{office.uuid}", "line-0-alloc-0-amount": "7.00",
+            "line-0-alloc-1-dest": f"project:{hallway.uuid}", "line-0-alloc-1-amount": "5.00"}
+    conflict = client_owner.post(reverse("receipts:save", args=[draft.uuid]), mine)
+    assert conflict.status_code == 409
+    body = conflict.content.decode()
+    assert "Not saved yet: this draft changed since you opened it" in body
+    for value in ('value="Typed by owner"', 'value="My glue"', 'value="7.00"', 'value="5.00"', 'value="2026-09-27"',
+                  "Check this line", 'name="version" value="2"', "data-dirty-on-load", "Save draft (keep my version)"):
+        assert value in body, value
+    draft.refresh_from_db()
+    assert draft.version == 2 and draft.data["merchant"] == "Sample Hardware Co"  # nothing silently forced
+    # Deliberate retry with the current version keeps the owner's version.
+    saved = client_owner.post(reverse("receipts:save", args=[draft.uuid]), {**mine, "version": "2"})
+    assert saved.status_code == 302
+    draft.refresh_from_db()
+    assert draft.version == 3 and draft.data["merchant"] == "Typed by owner"
+    assert draft.data["lines"][0]["allocations"][1]["amount"] == "5.00"
+    assert draft.data["extraction"]["job_id"]  # reading metadata kept with the owner's values
+    page = client_owner.get(reverse("receipts:review", args=[draft.uuid])).content.decode()
+    assert 'value="Typed by owner"' in page and 'value="My glue"' in page
+    assert_no_cost(owner)

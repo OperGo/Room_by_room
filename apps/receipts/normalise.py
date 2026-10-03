@@ -98,18 +98,43 @@ def _blank_line(description, line_type, category, quantity, amount, flag, foreig
     }
 
 
+UNCERTAIN_FIELDS = {"merchant", "receipt_date", "currency", "total", "items"}
+SCALAR_FIELDS = ("merchant", "receipt_date", "currency", "total", "receipt_number")
+
+
+def _list_of(raw, key, member_type, required=True):
+    """Return raw[key] if it is a list; members of the wrong type are a schema violation."""
+    value = raw.get(key)
+    if value is None and not required:
+        return []
+    if not isinstance(value, list):
+        raise NormaliseError(f"Field {key!r} was not a list.")
+    if member_type is not None and any(not isinstance(member, member_type) for member in value):
+        raise NormaliseError(f"Field {key!r} had members of the wrong type.")
+    return value
+
+
 def normalise(raw, today=None):
-    """Turn provider JSON into draft data. Raises NormaliseError if it is not usable at all."""
+    """Turn provider JSON into draft data.
+
+    Raises NormaliseError when the result does not follow the schema at all (wrong container
+    or member types): the job then fails permanently and the draft is untouched. Individual
+    item/adjustment rows that are not objects are skipped and make the reading *incomplete*.
+    Reconciliation only ever describes the lines actually kept in the draft.
+    """
     if not isinstance(raw, dict):
         raise NormaliseError("Result was not an object.")
     today = today or datetime.date.today()
-    items = raw.get("items") if isinstance(raw.get("items"), list) else None
-    adjustments = raw.get("adjustments") if isinstance(raw.get("adjustments"), list) else []
-    if items is None:
-        raise NormaliseError("Result had no item list.")
+    items = _list_of(raw, "items", None)
+    adjustments = _list_of(raw, "adjustments", None, required=False)
+    uncertain_raw = _list_of(raw, "uncertain_fields", str, required=False)
+    warnings_raw = _list_of(raw, "warnings", str, required=False)
+    for key in SCALAR_FIELDS:
+        if isinstance(raw.get(key), (dict, list)):
+            raise NormaliseError(f"Field {key!r} was not a scalar.")
 
-    uncertain = {f for f in (raw.get("uncertain_fields") or []) if f in {"merchant", "receipt_date", "currency", "total", "items"}}
-    warnings = [_text(w, 200) for w in (raw.get("warnings") or []) if isinstance(w, str) and w.strip()][:5]
+    uncertain = {f for f in uncertain_raw if f in UNCERTAIN_FIELDS}
+    warnings = [_text(w, 200) for w in warnings_raw if w.strip()][:5]
 
     merchant = _text(raw.get("merchant"), 120)
     if not merchant:
@@ -141,19 +166,11 @@ def normalise(raw, today=None):
     if total is None:
         uncertain.add("total")
 
-    lines, tax_notes, dropped = [], [], 0
-    max_lines = settings.RECEIPT_MAX_LINES
-
-    def add(line):
-        nonlocal dropped
-        if len(lines) >= max_lines:
-            dropped += 1
-        else:
-            lines.append(line)
-
-    known_sum, unknown_amounts = Decimal("0.00"), 0
+    # Build candidate lines with their Decimal amounts, then keep at most RECEIPT_MAX_LINES.
+    candidates, tax_notes, skipped = [], [], 0
     for item in items:
         if not isinstance(item, dict):
+            skipped += 1
             continue
         amount = parse_amount(item.get("line_total"))
         flag = bool(item.get("uncertain")) or amount is None
@@ -162,16 +179,14 @@ def normalise(raw, today=None):
             line_type, category = "discount", "other"
         else:
             line_type, category = "item", "material"
-        if amount is None:
-            unknown_amounts += 1
-        else:
-            known_sum += amount
-        foreign = f"{currency} {amount}" if (not prefill and amount is not None) else ""
-        add(_blank_line(_text(item.get("description"), 160) or "Item", line_type, category,
-                        _quantity(item.get("quantity")), str(amount) if (prefill and amount is not None) else "", flag, foreign))
+        candidates.append((amount, _blank_line(
+            _text(item.get("description"), 160) or "Item", line_type, category, _quantity(item.get("quantity")),
+            str(amount) if (prefill and amount is not None) else "", flag,
+            f"{currency} {amount}" if (not prefill and amount is not None) else "")))
 
     for adj in adjustments:
         if not isinstance(adj, dict):
+            skipped += 1
             continue
         kind = adj.get("kind")
         description = _text(adj.get("description"), 160)
@@ -192,33 +207,42 @@ def normalise(raw, today=None):
             line_type, description = "adjustment", description or "Tax added on top of prices"
         else:
             line_type, description = "adjustment", description or "Adjustment"
-        if amount is None:
-            unknown_amounts += 1
-        else:
-            known_sum += amount
-        foreign = f"{currency} {amount}" if (not prefill and amount is not None) else ""
-        add(_blank_line(description, line_type, "other", "1",
-                        str(amount) if (prefill and amount is not None) else "",
-                        bool(adj.get("uncertain")) or amount is None, foreign))
+        candidates.append((amount, _blank_line(
+            description, line_type, "other", "1", str(amount) if (prefill and amount is not None) else "",
+            bool(adj.get("uncertain")) or amount is None,
+            f"{currency} {amount}" if (not prefill and amount is not None) else "")))
 
+    max_lines = settings.RECEIPT_MAX_LINES
+    retained = candidates[:max_lines]
+    dropped = len(candidates) - len(retained)
+    lines = [line for _, line in retained]
+    incomplete = bool(dropped or skipped)
     if dropped:
-        warnings.append(f"Only the first {max_lines} lines were kept; {dropped} more were not imported.")
+        warnings.append(f"This reading is incomplete: only the first {max_lines} lines were kept and "
+                        f"{dropped} more were not imported.")
+    if skipped:
+        warnings.append(f"This reading is incomplete: {skipped} unreadable line{'s were' if skipped != 1 else ' was'} skipped.")
+
+    retained_sum = sum((amount for amount, _ in retained if amount is not None), Decimal("0.00"))
+    unknown_amounts = sum(1 for amount, _ in retained if amount is None)
     offer_unitemised = False
     reconciled = False
     if not lines:
         uncertain.add("items")
-        if total is not None:
+        if total is not None and not incomplete:
             offer_unitemised = True
             warnings.append("No items could be read. After checking the receipt you can record a single "
                             "“Unitemised purchase” line for the total.")
     elif prefill and total is not None:
         if unknown_amounts:
             warnings.append(f"{unknown_amounts} line{'s' if unknown_amounts != 1 else ''} had no readable amount.")
-        elif known_sum != total:
-            warnings.append(f"Items add up to {format_gbp(known_sum)} but the receipt total is {format_gbp(total)}. "
+        elif retained_sum != total:
+            warnings.append(f"Items add up to {format_gbp(retained_sum)} but the receipt total is {format_gbp(total)}. "
                             "Add missing items or correct the amounts.")
-        else:
+        elif not incomplete:
             reconciled = True
+    if incomplete:
+        uncertain.add("items")
 
     return {
         "description": "",
@@ -236,6 +260,7 @@ def normalise(raw, today=None):
             "warnings": warnings,
             "tax_notes": tax_notes[:3],
             "reconciled": reconciled,
+            "incomplete": incomplete,
             "offer_unitemised": offer_unitemised,
             "gbp_confirmation_required": currency_status != "gbp",
         },

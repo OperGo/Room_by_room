@@ -10,7 +10,7 @@ import pytest
 from PIL import Image
 from playwright.sync_api import expect
 
-from apps.costs.selectors import overall_summary, project_cost_summary
+from apps.costs.selectors import overall_summary, project_cost_summary  # noqa: F401
 from apps.projects.models import Project
 
 from .conftest import sign_in
@@ -241,3 +241,82 @@ def test_phone_polling_never_replaces_typed_values(phone, live_server, owner, se
     expect(phone.get_by_text("Reading finished.").first).to_be_visible(timeout=15000)
     expect(phone.locator("#f-merchant")).to_have_value("Typed while reading")
     expect(phone.locator("[data-reading-dirty]")).to_be_visible()
+
+
+# ------------------------------------------------------------------ Sprint 2A: editing during reading
+
+
+def _start_reading(page, live_server, owner, settings):
+    settings.RECEIPT_EXTRACTOR = "fake"
+    project, draft = _reading_draft(owner)
+    Project.objects.create(owner=owner, title="Hallway")
+    sign_in(page, live_server)
+    page.goto(f"{live_server.url}/receipts/{draft.uuid}/")
+    page.get_by_role("button", name="Read receipt automatically").click()
+    expect(page.get_by_text("Waiting to read the receipt…")).to_be_visible()
+    return project, draft
+
+
+def test_typing_during_reading_then_save_conflict_is_recoverable(phone, live_server, owner, settings):
+    from apps.receipts.jobs import process_available
+    from apps.receipts.models import ReceiptDraft
+
+    project, draft = _start_reading(phone, live_server, owner, settings)
+    phone.fill("#f-merchant", "Typed while reading")
+    phone.fill("#l0-desc", "My own item")
+    phone.fill("#l0-amt", "9.99")
+    phone.select_option("#l0-a0-dest", f"project:{project.uuid}")
+    process_available()
+    expect(phone.locator("[data-reading-dirty]")).to_be_visible(timeout=15000)
+    phone.get_by_role("button", name="Save draft for later").click()
+    expect(phone.get_by_text("Not saved yet: this draft changed since you opened it")).to_be_visible()
+    expect(phone.locator("#f-merchant")).to_have_value("Typed while reading")
+    expect(phone.locator("#l0-amt")).to_have_value("9.99")
+    phone.get_by_role("button", name="Save draft (keep my version)").click()
+    expect(phone.get_by_text("Draft saved.")).to_be_visible()
+    phone.reload()
+    expect(phone.locator("#f-merchant")).to_have_value("Typed while reading")
+    expect(phone.locator("#l0-desc")).to_have_value("My own item")
+    expect(phone.locator("#l0-a0-dest")).to_have_value(f"project:{project.uuid}")
+    assert ReceiptDraft.objects.get(pk=draft.pk).data["merchant"] == "Typed while reading"
+    assert overall_summary(owner).total == Decimal("0.00")
+
+
+def test_structural_edits_without_typing_block_auto_reload(phone, live_server, owner, settings):
+    from apps.receipts.jobs import process_available
+
+    project, draft = _start_reading(phone, live_server, owner, settings)
+    phone.get_by_role("button", name="Add item", exact=True).click()
+    phone.get_by_role("button", name="Add delivery, discount or rounding").click()
+    phone.locator("[data-line]").nth(0).locator("[data-remove-line]").evaluate("b => b.click()")
+    line = phone.locator("[data-line]").nth(0)
+    line.locator("summary").click()
+    line.get_by_role("button", name="Split between projects").click()
+    line.locator("[data-remove-alloc]").last.click()
+    count_before = phone.locator("[data-line]").count()
+    process_available()
+    expect(phone.locator("[data-reading-done]")).to_be_visible(timeout=15000)
+    phone.wait_for_timeout(1500)
+    assert phone.locator("[data-line]").count() == count_before  # no reload happened
+    expect(phone.locator("[data-line] input[name$='-description']").last).to_have_value("Delivery")
+    assert overall_summary(owner).total == Decimal("0.00")
+
+
+def test_edit_before_read_or_retry_is_stopped_until_saved(phone, live_server, owner, settings):
+    from apps.receipts.models import ExtractionJob
+
+    settings.RECEIPT_EXTRACTOR = "fake"
+    project, draft = _reading_draft(owner)
+    sign_in(phone, live_server)
+    phone.goto(f"{live_server.url}/receipts/{draft.uuid}/")
+    phone.fill("#f-merchant", "Unsaved merchant")
+    phone.get_by_role("button", name="Read receipt automatically").click()
+    expect(phone.get_by_text("You have unsaved changes.")).to_be_visible()
+    expect(phone.locator("#f-merchant")).to_have_value("Unsaved merchant")
+    assert ExtractionJob.objects.count() == 0
+    phone.get_by_role("button", name="Save draft for later").click()
+    expect(phone.get_by_text("Draft saved.")).to_be_visible()
+    phone.once("dialog", lambda d: d.accept())  # explicit: the reading will replace saved values
+    phone.get_by_role("button", name="Read receipt automatically").click()
+    expect(phone.get_by_text("Waiting to read the receipt…")).to_be_visible()
+    assert ExtractionJob.objects.count() == 1

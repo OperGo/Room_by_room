@@ -114,7 +114,7 @@ def test_lengths_rows_dates_and_card_numbers_are_bounded(settings):
     assert len(data["lines"]) == 3
     assert "4111" not in data["lines"][0]["description"]
     warnings = " ".join(data["extraction"]["warnings"])
-    assert "Only the first 3 lines" in warnings and "future" in warnings
+    assert "only the first 3 lines were kept" in warnings and "future" in warnings
     assert normalise(raw(receipt_date="26/09/2026"), today=TODAY)["transaction_date"] == ""
 
 
@@ -128,3 +128,55 @@ def test_instructions_in_receipt_text_are_just_data():
 def test_malformed_results_are_rejected(bad):
     with pytest.raises(NormaliseError):
         normalise(bad, today=TODAY)
+
+
+# ------------------------------------------------------------------ Sprint 2A regressions
+
+
+@pytest.mark.parametrize("patch", [
+    {"uncertain_fields": [{}]},          # CTO reproduction: TypeError before 2A
+    {"warnings": 1},                     # CTO reproduction: TypeError before 2A
+    {"warnings": ["ok", 3]},
+    {"uncertain_fields": "total"},
+    {"adjustments": {"kind": "delivery"}},
+    {"merchant": {"name": "x"}},
+    {"total": ["31.17"]},
+])
+def test_malformed_containers_and_members_are_schema_failures(patch):
+    with pytest.raises(NormaliseError):
+        normalise(raw(**patch), today=TODAY)
+
+
+def test_truncation_never_claims_reconciliation(settings):
+    settings.RECEIPT_MAX_LINES = 3
+    six = [{"description": f"Item {i}", "quantity": None, "line_total": "1.00", "uncertain": False} for i in range(6)]
+    data = normalise(raw(total="6.00", items=six, adjustments=[]), today=TODAY)
+    assert len(data["lines"]) == 3
+    assert data["total"] == "6.00"  # original total kept
+    assert data["extraction"]["reconciled"] is False and data["extraction"]["incomplete"] is True
+    warnings = " ".join(data["extraction"]["warnings"])
+    assert "This reading is incomplete" in warnings
+    assert "Items add up to £3.00 but the receipt total is £6.00. Add missing items or correct the amounts." in warnings
+    assert sum(Decimal(line["amount"]) for line in data["lines"]) == Decimal("3.00")  # no balancing line
+
+
+def test_truncation_that_happens_to_match_is_still_incomplete(settings):
+    settings.RECEIPT_MAX_LINES = 2
+    rows = [{"description": "A", "quantity": None, "line_total": "3.00", "uncertain": False},
+            {"description": "B", "quantity": None, "line_total": "3.00", "uncertain": False},
+            {"description": "C", "quantity": None, "line_total": "0.00", "uncertain": False}]
+    data = normalise(raw(total="6.00", items=rows, adjustments=[]), today=TODAY)
+    assert data["extraction"]["reconciled"] is False and data["extraction"]["incomplete"] is True
+
+
+def test_skipped_malformed_rows_make_the_reading_incomplete():
+    rows = copy.deepcopy(SAMPLE_RESULT["items"]) + ["not an object", 7]
+    data = normalise(raw(items=rows), today=TODAY)
+    assert len(data["lines"]) == 5
+    assert data["extraction"]["incomplete"] is True and data["extraction"]["reconciled"] is False
+    assert "2 unreadable lines were skipped" in " ".join(data["extraction"]["warnings"])
+
+
+def test_complete_receipt_still_reconciles():
+    data = normalise(raw(), today=TODAY)
+    assert data["extraction"]["reconciled"] is True and data["extraction"]["incomplete"] is False

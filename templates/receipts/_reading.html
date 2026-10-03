@@ -9,7 +9,8 @@
       <span class="small" data-reading-attempt>{% if job_state.attempts %}Attempt {{ job_state.attempts }} of {{ job_state.max_attempts }}.{% endif %}</span>
       <p class="small" style="margin:4px 0 0">You can keep editing or enter the details yourself. Nothing is recorded until you confirm.</p>
       <p class="small" data-reading-stale {% if not job_state.stale_queue %}hidden{% endif %} style="margin:4px 0 0"><strong>Still waiting.</strong> The receipt worker may not be running; enter the details manually or try later.</p>
-      <p class="small" data-reading-done hidden style="margin:4px 0 0"><strong>Reading finished.</strong> <a href="" data-reading-reload>Show the result</a> <span data-reading-dirty hidden>(this reloads the page: save your typing as a draft first if you want to keep it)</span></p>
+      <p class="small" data-reading-done hidden style="margin:4px 0 0"><strong>Reading finished.</strong> Your changes on this page have been kept.
+        <span data-reading-dirty hidden>To keep them, press <strong>Save draft</strong> (you'll be asked to confirm because the draft changed). Or <a href="" data-reading-reload>show the stored reading instead (replaces your changes)</a>.</span></p>
     </div>
   </div>
 {% elif job_state.status == "failed" %}
@@ -17,15 +18,15 @@
     <strong>Couldn’t read this receipt.</strong> {{ job_state.error }}
     <span class="small">({{ job_state.attempts }} of {{ job_state.max_attempts }} attempt{{ job_state.max_attempts|pluralize }} used{% if job_state.usage.input_tokens %}; {{ job_state.usage.input_tokens }} input / {{ job_state.usage.output_tokens }} output tokens{% endif %})</span>
     <p class="small" style="margin:6px 0 0">Enter the details from the receipt below, or try reading again.</p>
-    <form method="post" action="{% url 'receipts:read' draft.uuid %}" style="margin-top:6px">{% csrf_token %}<input type="hidden" name="version" value="{{ version }}">
-      <button class="btn btn-secondary btn-sm" type="submit">{% icon "undo-2" 16 %}Try reading again</button></form>
+    <form method="post" action="{% url 'receipts:read' draft.uuid %}" style="margin-top:6px" data-requires-saved {% if draft.data.lines or draft.data.merchant %}data-confirm="When the new reading finishes it will replace the values saved in this draft. Continue?"{% endif %}>{% csrf_token %}<input type="hidden" name="version" value="{{ version }}">
+      <button class="btn btn-secondary btn-sm" type="submit">{% icon "undo-2" 16 %}Try reading again</button><p class="small unsaved-note" data-unsaved-note tabindex="-1" hidden role="alert"><strong>You have unsaved changes.</strong> Press <strong>Save draft</strong> first, then read the receipt, so nothing you entered is lost.</p></form>
   </div></div>
 {% elif job_state.status == "succeeded" and job_state.result_state == "held" %}
   <div class="alert alert-warning">{% icon "info" 18 %}<div>
     <strong>A reading finished after you changed this draft.</strong> Your edits were kept.
-    <form method="post" action="{% url 'receipts:apply_reading' draft.uuid %}" style="margin-top:6px" data-confirm="Replace the values in this draft with the automatic reading?">{% csrf_token %}
+    <form method="post" action="{% url 'receipts:apply_reading' draft.uuid %}" style="margin-top:6px" data-confirm="Replace the values saved in this draft with the automatic reading? Your saved values will be overwritten.">{% csrf_token %}
       <input type="hidden" name="version" value="{{ version }}"><input type="hidden" name="job" value="{{ job.pk }}">
-      <button class="btn btn-secondary btn-sm" type="submit">Replace my values with the reading</button></form>
+      <button class="btn btn-secondary btn-sm" type="submit">Replace my saved values with the reading</button></form>
   </div></div>
 {% elif job_state.status == "succeeded" and extraction.job_id == job.pk %}
   <div class="alert {% if extraction.warnings or extraction.uncertain_fields %}alert-warning{% else %}alert-success{% endif %}">{% icon "check" 18 %}<div>
@@ -37,8 +38,8 @@
   </div></div>
 {% else %}
   <div class="reading-offer card card-pad">
-    <form method="post" action="{% url 'receipts:read' draft.uuid %}">{% csrf_token %}<input type="hidden" name="version" value="{{ version }}">
-      <button class="btn btn-sage" type="submit" data-submit-once>{% icon "sparkles" 18 %}Read receipt automatically</button></form>
+    <form method="post" action="{% url 'receipts:read' draft.uuid %}" data-requires-saved {% if draft.data.lines or draft.data.merchant %}data-confirm="When the reading finishes it will replace the values saved in this draft. Continue?"{% endif %}>{% csrf_token %}<input type="hidden" name="version" value="{{ version }}">
+      <button class="btn btn-sage" type="submit" data-submit-once>{% icon "sparkles" 18 %}Read receipt automatically</button><p class="small unsaved-note" data-unsaved-note tabindex="-1" hidden role="alert"><strong>You have unsaved changes.</strong> Press <strong>Save draft</strong> first, then read the receipt, so nothing you entered is lost.</p></form>
     <p class="small muted" style="margin:8px 0 0">{{ provider_note }}</p>
   </div>
 {% endif %}

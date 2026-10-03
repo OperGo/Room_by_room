@@ -147,8 +147,8 @@ p { margin: 0 0 12px; }
 }
 a.row:hover { background: #FBFAF7; }
 .row-main { flex: 1; min-width: 0; }
-.row-title { font-weight: 600; overflow-wrap: anywhere; }
-.row-meta { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.row-title { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.row-meta { display: block; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
 .row-end { text-align: right; flex: none; }
 .row .chev { color: var(--muted); }
 
@@ -396,3 +396,5 @@ details.disclosure > summary::-webkit-details-marker { display: none; }
   .desktop-only { display: none !important; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+.row-meta > span + .dot-sep::before { content: " · "; }
+@media (max-width: 1023.98px) { .evidence img { max-height: 46vh; } .evidence iframe { height: 60vh; } }

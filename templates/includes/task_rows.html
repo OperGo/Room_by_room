@@ -14,11 +14,12 @@
     {% endif %}
     <a class="row-main" href="{% url 'projects:task_detail' task.uuid %}" style="color:inherit;text-decoration:none">
       <span class="row-title">{{ task.title }}</span>
-      <span class="row-meta">
-        {% if show_project %}{{ task.project.title }}{% endif %}
-        {% if task.status == "in_progress" %}{% if show_project %} · {% endif %}In progress{% endif %}
-        {% if task.estimated_minutes %} · {{ task.estimated_minutes|minutes }}{% endif %}
-        {% if task.due_date %} · due {{ task.due_date|date:"j M" }}{% endif %}
+      <span class="row-meta">{% spaceless %}
+        {% if show_project %}<span>{{ task.project.title }}</span>{% endif %}
+        {% if task.status == "in_progress" %}<span class="dot-sep">In progress</span>{% endif %}
+        {% if task.estimated_minutes %}<span class="dot-sep">{{ task.estimated_minutes|minutes }}</span>{% endif %}
+        {% if task.due_date %}<span class="dot-sep">due {{ task.due_date|date:"j M" }}</span>{% endif %}
+        {% endspaceless %}
         {% if task.waiting_on %}<br><span class="badge badge-warning">{% icon "lock" 12 %}Waiting on {{ task.waiting_on|join:", " }}</span>{% endif %}
         {% if task.done_before_prereq %}<br><span class="badge badge-outline">Completed before {{ task.waiting_on|join:", " }}</span>{% endif %}
         {% if task.completion_override_note %}<br><span class="badge badge-outline">Completed with override</span>{% endif %}

@@ -62,6 +62,38 @@ def sample_cabinetry_image():
                            checksum=hashlib.sha256(content).hexdigest(), width=w, height=h)
 
 
+def sample_receipt_image():
+    """A synthetic receipt, clearly marked as a sample. Contains no real data."""
+    from PIL import ImageFont
+
+    w, h = 900, 1500
+    im = Image.new("RGB", (w, h), "#FFFFFF")
+    d = ImageDraw.Draw(im)
+    try:
+        font = ImageFont.load_default(size=34)
+        small = ImageFont.load_default(size=26)
+    except TypeError:  # older Pillow
+        font = small = ImageFont.load_default()
+    y = 60
+    d.text((w // 2, y), "SAMPLE HARDWARE CO", fill="#111", font=font, anchor="mt"); y += 60
+    d.text((w // 2, y), "SAMPLE RECEIPT - NOT A REAL PURCHASE", fill="#555", font=small, anchor="mt"); y += 50
+    d.text((w // 2, y), "26/09/2026  14:12", fill="#333", font=small, anchor="mt"); y += 80
+    rows = [("Wood glue 500ml", "6.49"), ("Brad nails 30mm x2", "7.98"), ("Sanding sheets 120g", "8.50"),
+            ("Paint tray", "4.25"), ("Delivery", "3.95")]
+    for name, amount in rows:
+        d.text((70, y), name, fill="#111", font=font); d.text((w - 70, y), amount, fill="#111", font=font, anchor="ra"); y += 64
+    d.line([70, y, w - 70, y], fill="#999", width=3); y += 30
+    d.text((70, y), "TOTAL GBP", fill="#111", font=font); d.text((w - 70, y), "31.17", fill="#111", font=font, anchor="ra"); y += 90
+    d.text((w // 2, y), "Card payment  **** ****", fill="#555", font=small, anchor="mt")
+    out = io.BytesIO()
+    im.rotate(1.2, fillcolor="#F2F0EA", expand=False).save(out, format="JPEG", quality=85)
+    content = out.getvalue()
+    import hashlib
+
+    return ValidatedUpload(content=content, mime="image/jpeg", size=len(content),
+                           checksum=hashlib.sha256(content).hexdigest(), width=w, height=h)
+
+
 class Command(BaseCommand):
     help = "Create or refresh the disposable demo account with fictional sample data."
 
@@ -197,6 +229,10 @@ class Command(BaseCommand):
                 LineInput("Soft-close hinges", D("54.00"), [alloc(office, "54.00")], quantity=D("10"), unit_price=D("5.40")),
                 LineInput("Multi-buy discount", D("-5.40"), [alloc(office, "-5.40")], line_type="discount", category="other"),
             ]))
+
+        from apps.receipts.services import store_receipt
+
+        store_receipt(user, sample_receipt_image(), "sample-receipt.jpg")
 
         def item(description, quantity, unit="", project=None, task_obj=None, retailer="", bought=False):
             from django.utils import timezone

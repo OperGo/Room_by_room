@@ -5,6 +5,7 @@ There are **three separate procedures**. Do not mix them.
 | Procedure | Status | Applies to | Document |
 |---|---|---|---|
 | **Free preview** | Live at https://room-by-room.onrender.com/ (Sprint 2B, accepted) | The founder-created **free** web service and **free PostgreSQL 18** database (Frankfurt). Owner `alistair`, manual deploys, no API key or worker. | `docs/deployment-render-free-preview.md` |
+| **Milestone 1 recommendation (5 October 2026)** | Prepared; **needs founder approval** | A Render **Cron Job** running `process_receipts --once` every minute, the in-place database upgrade (0.1c-256mb, PostgreSQL 18), and the free web service kept. About US$8.50–11/month plus tax and API use. | `docs/receipt-runtime-decision.md` |
 | **Receipt-reading pilot** | **Paused by founder** (4 October 2026). Checklist kept as an unapplied option; no spending approved | Adds **one Starter worker** (Frankfurt) next to the existing free resources, plus a private API key on the worker and the web service. US$7 for at most a month and a US$5 API limit. | `docs/receipt-pilot.md` |
 | **Future in-place upgrade** | **Paused by founder** (paid hosting paused, 4 October 2026). Would need separate approval; the free database expires 2 November 2026 | Changes the **existing** web service and **existing PostgreSQL 18** database to paid instance types in the dashboard, keeping the URL, data, owner, secret and the pilot worker. About US$20.30/month before tax, API use and overages. | This document, "In-place upgrade" below |
 

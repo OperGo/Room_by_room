@@ -8,6 +8,10 @@ option**:
 - nothing in this guide may be bought, created or deployed without new explicit founder approval and a check
   of the Render dashboard quote.
 
+> **Superseded as the primary plan (5 October 2026):** the milestone 1 recommendation is a Cron Job running
+> `process_receipts --once` (`docs/receipt-runtime-decision.md`). This dedicated-worker checklist is kept as
+> the **fallback** if cron waiting time or cost proves worse than estimated.
+
 **Goal:** prove live receipt reading through to accurate, confirmed costs on the existing preview
 (https://room-by-room.onrender.com/).
 

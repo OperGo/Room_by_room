@@ -77,3 +77,17 @@ def test_pilot_checklist_matches_the_worker_and_settings():
     assert settings.RECEIPT_MAX_ATTEMPTS == 2 and settings.RECEIPT_IMAGE_LONG_EDGE == 1568
     blueprint = (ROOT / "render.yaml").read_text()
     assert "NEW-INSTALL ONLY" in blueprint
+
+
+def test_runtime_decision_checklist_matches_the_code():
+    doc = (ROOT / "docs" / "receipt-runtime-decision.md").read_text()
+    for text in ("Command `python manage.py process_receipts --once`", "Build command `pip install -r requirements.txt`",
+                 "Schedule `* * * * *`", "Region: **Frankfurt**", "Instance type **Starter**", "Auto-Deploy **Off**",
+                 "| `RECEIPT_MODEL` | `claude-haiku-4-5-20251001` |", "| `PRIVATE_STORAGE_BACKEND` | `database` |",
+                 "**Do not add the key yet.**", "Claimable at start: 0 job(s)", "keep **PostgreSQL 18**",
+                 "spend limit of US$5", "auto-reload is off"):
+        assert text in doc, text
+    assert not re.search(r"sk-ant-|postgres(ql)?://[^\s:/]+:[^\s@]+@", doc)
+    from django.core.management import get_commands
+
+    assert "process_receipts" in get_commands() and "receipt_jobs" in get_commands()

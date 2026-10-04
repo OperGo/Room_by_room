@@ -1,0 +1,32 @@
+Milestone 1 — local synthetic rehearsal of 'Render Cron Job runs python manage.py process_receipts --once' (5 October 2026)
+PostgreSQL 18.6 stand-in over its Unix socket; production settings (DEBUG off, database file storage); fake extractor with simulated latency (RECEIPT_FAKE_DELAY_SECONDS); no network or provider calls. Each '--once' is a separate process, as each Render cron run is a fresh container. Times are compressed (runs every few seconds instead of every minute; retry delay 5 s and lease 8 s instead of 30 s and 180 s).
+
+Idle --once runtime (no claimable jobs), same settings, this machine: cold 3.29 s, then 0.51 / 0.52 / 0.55 / 0.49 s.
+
+== A. Cadence: a reading requested between scheduled runs (schedule simulated every 20 s; real: every minute)
+   requested job 8
+   run @+7s : Claimable at start: 1 job(s) (ids [8]) Processed 1 job(s). 
+   8 | 3b57e01c | succeeded | applied | 1/2 | 13.5 | 6.0 | fake-test-extractor | 0/0 | -
+   request-to-result: 13.5 s (wait for the next run + start-up + 6 s simulated reading)
+== B. Retryable provider error, then success on a later scheduled run (retry delay 5 s for the rehearsal)
+   requested job 9
+   run 1   : Claimable at start: 1 job(s) (ids [9]) Processed 1 job(s). 
+   9 | 3b57e01c | queued | none | 1/2 | - | - | - | 0/0 | timeout
+   run 2 (@+2s, before retry delay): Claimable at start: 0 job(s) Processed 0 job(s). 
+   run 3 (@+7s): Claimable at start: 1 job(s) (ids [9]) Processed 1 job(s). 
+   9 | 3b57e01c | succeeded | applied | 2/2 | 6.9 | 0.0 | fake-test-extractor | 0/0 | -
+== C. A run killed mid-reading (container stopped), then lease recovery on later runs (lease 8 s for the rehearsal)
+   requested job 10
+   run 1 killed with SIGKILL at +3 s
+   10 | 3b57e01c | processing | none | 1/2 | - | - | - | 0/0 | -
+   run 2 (lease still held): Claimable at start: 0 job(s) Processed 0 job(s). 
+   run 3 (lease expired): Claimable at start: 1 job(s) (ids [10]) Processed 1 job(s). 
+   10 | 3b57e01c | succeeded | applied | 2/2 | 12.5 | 1.0 | fake-test-extractor | 0/0 | -
+== D. Two runs overlapping (Render normally prevents this; the database claim also does): two queued jobs
+   requested job 11
+   requested job 12
+   run A: Claimable at start: 2 job(s) (ids [11, 12]) Processed 1 job(s). 
+   run B: Claimable at start: 1 job(s) (ids [12]) Processed 1 job(s). 
+   12 | 2fab9d55 | succeeded | applied | 1/2 | 3.5 | 3.0 | fake-test-extractor | 0/0 | -
+   11 | 3b57e01c | succeeded | applied | 1/2 | 3.5 | 3.0 | fake-test-extractor | 0/0 | -
+   purchases before: 1, after: 1 (readings record no cost)

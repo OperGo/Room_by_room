@@ -70,11 +70,16 @@ class RemoteDatabase:
         password = unquote(parsed.password)
         del url, parsed
         self.tmpdir = tempfile.mkdtemp(prefix="rbr-")  # 0700
-        self.passfile = os.path.join(self.tmpdir, "pgpass")
-        fd = os.open(self.passfile, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "w") as handle:
-            handle.write(":".join(_passfile_field(v) for v in (self.host, self.port, self.dbname, self.user, password)) + "\n")
-        del password
+        try:  # __exit__ only runs once __enter__ returns: clean up here if writing the passfile fails
+            self.passfile = os.path.join(self.tmpdir, "pgpass")
+            fd = os.open(self.passfile, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w") as handle:
+                handle.write(":".join(_passfile_field(v) for v in (self.host, self.port, self.dbname, self.user, password)) + "\n")
+        except BaseException:
+            shutil.rmtree(self.tmpdir, ignore_errors=True)
+            raise
+        finally:
+            del password
         return self
 
     def __exit__(self, *exc):
@@ -108,8 +113,11 @@ def fingerprint(env):
     return json.loads(out)
 
 
-def write_private(path, text):
+def write_private(path, text, created=None):
+    """Create ``path`` (0600, never overwriting) and record it in ``created`` before writing."""
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    if created is not None:
+        created.append(Path(path))
     with os.fdopen(fd, "w") as handle:
         handle.write(text)
 
@@ -140,30 +148,34 @@ def cmd_backup(args):
     out_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     stamp = datetime.date.today().isoformat()
     dump = out_dir / f"room-by-room-{stamp}.dump"
-    if dump.exists():
-        raise HelperError(f"{dump} already exists; move it or choose another --out.")
+    fingerprint_file = dump.with_suffix(".fingerprint.json")
+    existing = [p for p in (dump, fingerprint_file) if p.exists()]
+    if existing:  # never overwrite or delete earlier backups
+        raise HelperError(f"{existing[0]} already exists; move it or choose another --out.")
     pg_dump = tool("pg_dump", args.pg_bin)
     answer = input("Stop using the app (phone and browser) until this finishes, so the copy is consistent. "
                    "Ready? [y/N] ")
     if answer.strip().lower() not in {"y", "yes"}:
         raise HelperError("Backup cancelled.")
-    with RemoteDatabase() as db:
-        try:
-            before = fingerprint(db.env())
-        except HelperError as exc:
-            raise HelperError(f"{exc} {REMOTE_HINT}") from None
-        os.umask(0o077)
-        try:
+    created = []  # only files this attempt created; removed on any failure or interruption
+    try:
+        with RemoteDatabase() as db:
+            try:
+                before = fingerprint(db.env())
+            except HelperError as exc:
+                raise HelperError(f"{exc} {REMOTE_HINT}") from None
+            os.umask(0o077)
+            created.append(dump)
             run([pg_dump, "--format=custom", "--no-owner", "--no-acl", "--file", str(dump), *db.pg_args()], db.env())
-        except BaseException:
-            dump.unlink(missing_ok=True)  # never leave a partial export behind
-            raise
-        after = fingerprint(db.env())
-    if before != after:
-        dump.unlink(missing_ok=True)
-        raise HelperError("The data changed while exporting (someone used the app). Nothing kept; run it again.")
-    os.chmod(dump, 0o600)
-    write_private(dump.with_suffix(".fingerprint.json"), json.dumps(before, indent=2, sort_keys=True))
+            after = fingerprint(db.env())
+        if before != after:
+            raise HelperError("The data changed while exporting (someone used the app). Nothing kept; run it again.")
+        os.chmod(dump, 0o600)
+        write_private(fingerprint_file, json.dumps(before, indent=2, sort_keys=True), created)
+    except BaseException:
+        for path in created:
+            path.unlink(missing_ok=True)
+        raise
     print(f"Backup written: {dump} ({dump.stat().st_size:,} bytes) and its fingerprint. Keep both private "
           f"(encrypted storage). Files: {before['files']['count']}; confirmed purchases: {before['confirmed_purchases']}.")
 

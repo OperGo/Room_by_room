@@ -1,7 +1,12 @@
 # Free preview on Render: founder-applied checklist
 
-**Status:** prepared and rehearsed locally. **Not yet applied.** The founder applies these settings to the
-resources he already created and runs the manual deploy. Hosted behaviour is **unverified** until then.
+> **Current state (4 October 2026):** applied and live. The database has since been **upgraded in place to
+> paid PostgreSQL 18** (no expiry, managed backups), and a **receipt cron job** with a private API key is
+> active. See `docs/receipt-runtime-decision.md` → "Current setup". The free-database limits below (expiry, no
+> managed backups, no automatic reading) no longer apply; the free web service limits still do.
+
+**Status (Sprint 2B):** applied by the founder to the resources already created, with a manual deploy; hosted
+behaviour verified by the founder (accepted).
 
 This preview uses the founder's existing **free** web service and **free** PostgreSQL database in the
 "Room by Room" project. Do not apply the paid Blueprint (`render.yaml`) and do not create replacement

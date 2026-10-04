@@ -2,9 +2,20 @@
 
 Milestone 1 recommendation, accepted by the CTO on 5 October 2026; preflight corrections applied.
 
-**Status:** nothing has been approved, bought, created or deployed. Applying this needs:
-- the founder's **explicit budget approval**;
-- a check of the **actual dashboard quotes** (checklist below).
+**Status: approved and applied (Milestone 2, 4 October 2026).** The founder approved the budget (relayed by
+the CTO) and applied the setup below. Live receipt testing (R1–R5) is in progress.
+
+## Current setup (as applied)
+
+| Part | State |
+|---|---|
+| Web service | **Free** (unchanged URL, owner and secret). `ANTHROPIC_API_KEY` set privately; deployed commit `9372c48`; `/healthz/` ok; "Read receipt automatically" shown. |
+| Database | Existing PostgreSQL 18 **upgraded in place to paid** `0.1c-256mb`, 1 GB (about US$6.30/month). Data, URL and owner kept; no expiry; Render managed backups. External access stays closed. |
+| Receipt reading | Cron Job `room-by-room-receipts`: Starter (US$0.00016/min), Frankfurt, `* * * * *`, `python manage.py process_receipts --once`, Auto-Deploy Off, deployed at `c85e964`, `ANTHROPIC_API_KEY` set via save-and-deploy. **Active.** First runs: without the key, "not configured" and `Claimable at start: 0 job(s)`; with the key, Claimable 0, Processed 0. |
+| Anthropic | `Room by Room` workspace; **US$5 monthly spend limit**; **auto-reload off**; **US$5 credit purchased** (the minimum purchase). The key is kept only in the founder's password manager. |
+
+`9372c48` and `c85e964` differ only in documentation, so the two services run the same application code. Later
+documentation-only commits need no redeploy.
 
 ## Recommendation
 
@@ -95,7 +106,7 @@ about 30%. Readings requested overnight then wait until 06:00 UTC.
 
 ## Spending boundaries
 
-All of these need the founder's approval first.
+Approved by the founder (relayed by the CTO, 4 October 2026). Nothing beyond them is approved.
 
 | Boundary | Value | Kind |
 |---|---|---|
@@ -109,7 +120,7 @@ All of these need the founder's approval first.
 **Backups:** the paid database's managed backups do **not** replace Milestone 4's recovery check before relying
 on important records. The founder's no-manual-backup decision still stands for the disposable preview.
 
-## Founder setup checklist (apply only after explicit approval)
+## Founder setup checklist (applied 4 October 2026; kept for reference and rebuilds)
 
 **Before starting**, confirm on the dashboards and report any difference:
 - the cron job's Starter rate (US$0.00016/minute);
@@ -197,8 +208,36 @@ For each receipt, record:
 4. Going back and confirming again **does not double-count**.
 5. **Private files:** copy an "Open original" link, sign out (Home → Sign out), open the link in the same
    browser, and expect the sign-in page.
-6. **Provider failure:** in a private window, upload a non-receipt photo and tap Read. Expect a failure or a
-   mostly empty flagged reading, with **manual entry still available** and **nothing recorded**.
+6. **Extraction failure leaves manual entry available.** A non-receipt photo may still produce a successful
+   flagged draft, so it does not guarantee a failure. Use a real terminal failure if one happens; otherwise run
+   the **intentional authentication-failure check** below.
+
+### Intentional authentication-failure check (CTO-approved)
+
+This is extra to the five samples and never counts towards accuracy. Report it as an intentional
+authentication failure, not a provider outage.
+
+1. Pause uploads. On the cron job's Runs/Events page, **wait for an empty queue and no active run**.
+2. Cron job → **Environment**: replace **only the cron job's** `ANTHROPIC_API_KEY` with `invalid-pilot-test-key`,
+   then **"Save, rebuild, and deploy"**. **Keep the web service's valid key unchanged.**
+3. Signed in, create a **fresh disposable draft** from an already-used, valid receipt image (for example the R1
+   photo) and tap Read. Expect an authentication failure **without an automatic retry** (1 attempt).
+4. Check that **manual entry is still available** and **Costs is unchanged**. Leave the draft **unconfirmed**.
+5. Restore the real key on the cron job **privately** from the password manager, then "Save, rebuild, and
+   deploy".
+6. Verify restoration with **another fresh, unconfirmed** reading of a valid image (or the next real sample).
+   Diagnostic re-reads are not independent accuracy samples.
+
+### What counts as a sample
+
+- **Mixed documents are acceptable:** genuine historical receipts, itemised supplier PDF invoices and online
+  order confirmations with final GBP totals and checkable lines. Keep coverage of delivery/discount, the
+  two-project split, an imperfect photo and a PDF or typical document.
+- If two documents describe the **same purchase**, record it only once.
+- **Missing values:** a value absent from the document that the draft leaves **blank or flagged**, and the owner
+  then fills in, is manual completion, not a transcription error. An **invented, unflagged** value is an
+  accuracy defect. If the original behaviour cannot be recalled, mark it **unverified**.
+- If coverage is still missing on 7 October, report the specific gap; dates do not move automatically.
 
 ### Collecting the `receipt_jobs` evidence (attempts, model, tokens, timings)
 
@@ -221,9 +260,11 @@ No extra diagnostic service and no database credentials are needed, and nothing 
 that sanitised output.
 
 **Also collect:**
-- **Actual API spend:** Anthropic Console → Usage, for the `Room by Room` workspace.
-- **Actual cron usage after 24 hours:** Render → Billing (or the cron job's usage). Project a month from it and
-  apply the US$5/month monitoring threshold.
+- **Actual API spend:** Anthropic Console → Usage/Cost, for the `Room by Room` workspace. Report **credit
+  consumed** separately from **credit purchased** (US$5) and the remaining balance.
+- **Actual cron usage after 24 hours:** Render → Billing (or the cron job's usage). Record the **elapsed period**
+  and the billed minutes or dollars, project a 30-day month from it, and apply the US$5/month monitoring
+  threshold. This check is independent of receipt testing.
 
 ## Fallback (separate approval)
 

@@ -172,7 +172,7 @@ RECEIPT_MAX_ATTEMPTS = 2
 RECEIPT_RETRY_DELAY_SECONDS = int(os.environ.get("RECEIPT_RETRY_DELAY_SECONDS", "30"))
 RECEIPT_MAX_OUTPUT_TOKENS = 8192
 RECEIPT_IMAGE_LONG_EDGE = 1568  # standard-tier vision limit for claude-haiku-4-5
-RECEIPT_STALE_QUEUE_SECONDS = 120
+RECEIPT_STALE_QUEUE_SECONDS = 300  # readings normally start within 1-2 minutes on the cron schedule
 RECEIPT_FAKE_DELAY_SECONDS = float(os.environ.get("RECEIPT_FAKE_DELAY_SECONDS", "0"))  # fake extractor only  # UI hint when no worker seems to be running
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -568,3 +568,12 @@ def test_worker_log_lines_are_flushed_immediately(owner, draft):
     out = Pipe()
     call_command("process_receipts", "--once", stdout=out)
     assert "Claimable at start: 0 job(s)" in out.getvalue() and Pipe.flushes >= 2  # announced + processed lines
+
+
+def test_waiting_message_fits_the_cron_schedule(client_owner, owner, draft):
+    # Milestone 2: a once-a-minute cron (plus cold start) must not look like a broken worker.
+    job = jobs.request_reading(owner, draft, draft.version)
+    assert jobs.job_state(job, now=job.created_at + datetime.timedelta(seconds=150))["stale_queue"] is False
+    assert jobs.job_state(job, now=job.created_at + datetime.timedelta(seconds=301))["stale_queue"] is True
+    page = client_owner.get(reverse("receipts:review", args=[draft.uuid])).content.decode()
+    assert "Readings normally start within 1–2 minutes." in page and "may not be running" not in page

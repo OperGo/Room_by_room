@@ -35,7 +35,9 @@ def desktop(browser):
 
 
 def no_horizontal_scroll(page):
-    return page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+    # Compare with the device width: on a mobile viewport Chromium widens the layout viewport (innerWidth)
+    # to fit overflowing content, so innerWidth alone would hide the overflow.
+    return page.evaluate("document.documentElement.scrollWidth <= Math.min(window.innerWidth, screen.width)")
 
 
 def test_phone_project_and_task_flow(phone, live_server, owner):
@@ -121,13 +123,16 @@ def test_desktop_split_allocation(desktop, live_server, owner):
     assert project_cost_summary(hallway).net == Decimal("9.50")
 
 
-def test_phone_layout_without_horizontal_scroll(phone, live_server, owner):
+def test_phone_layout_without_horizontal_scroll(browser, live_server, owner):
     Project.objects.create(owner=owner, title="A very long project title that keeps going and going for the layout test")
-    page = phone
+    # iPhone-like pixel density: Chromium sizes date inputs with the scale factor, which exposed an overflow.
+    context = browser.new_context(viewport=PHONE, device_scale_factor=3, has_touch=True, is_mobile=True)
+    page = context.new_page()
     sign_in(page, live_server)
-    for path in ("/", "/projects/", "/shopping/", "/costs/", "/receipts/new/", "/costs/purchases/new/"):
+    for path in ("/", "/projects/", "/projects/new/", "/shopping/", "/costs/", "/receipts/new/", "/costs/purchases/new/"):
         page.goto(f"{live_server.url}{path}")
         assert no_horizontal_scroll(page), path
+    context.close()
 
 
 TARGETS = ("a.btn, button.btn, .icon-btn, .task-check, .shop-check, nav.bottom-nav a, .seg-full a, .tabs a, "

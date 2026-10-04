@@ -1,0 +1,50 @@
+Sprint 2B — manual backup/restore rehearsal for free Postgres (no managed backups), 4 October 2026
+Local PostgreSQL 18.6 (TLS-only TCP) standing in for the founder-created free database; fictional data from the preview walkthrough.
+
+1. pg_dump 16.14 against the PG 18.6 server (PGSSLMODE=require):
+   pg_dump: error: aborting because of server version mismatch
+   pg_dump: detail: server version: 18.6; pg_dump version: 16.14
+   -> the founder's pg_dump must be the same major version as the server or newer.
+2. python manage.py restore_fingerprint (read-only, external-style URL, PGSSLMODE=require) -> before.json
+3. pg_dump 18.6 -Fc --no-owner --no-acl over TLS -> 99,425 bytes
+4. createdb + pg_restore 18.6 --no-owner --no-acl --exit-on-error into an isolated local database -> exit 0
+5. restore_fingerprint on the restored copy -> after.json; diff -> IDENTICAL
+
+Restored fingerprint:
+{
+  "confirmed_purchases": 1,
+  "files": {
+    "count": 3,
+    "digest": "6cdcdbb17003bca0feb4a5a888efbe1f503334774312c1309da6804916767966",
+    "missing_references": 0,
+    "receipt_checksum_mismatches": 0,
+    "references": 3,
+    "size_mismatches": 0
+  },
+  "money": {
+    "owner-1": {
+      "overall_total": "12.50",
+      "projects": {
+        "cd0de8c8-37b5-49b7-989d-5bbbd7e32420": "12.50"
+      }
+    }
+  },
+  "row_counts": {
+    "core.ChangeEvent": 1,
+    "core.StoredFile": 3,
+    "costs.CostAllocation": 2,
+    "costs.OpeningBalanceDecision": 0,
+    "costs.OpeningCostBalance": 0,
+    "costs.Purchase": 1,
+    "costs.PurchaseEvidence": 1,
+    "costs.PurchaseLine": 2,
+    "projects.Project": 1,
+    "projects.ProjectPhoto": 1,
+    "projects.Task": 0,
+    "projects.TaskDependency": 0,
+    "receipts.ExtractionJob": 0,
+    "receipts.ReceiptDocument": 2,
+    "receipts.ReceiptDraft": 2,
+    "shopping.ShoppingItem": 0
+  }
+}

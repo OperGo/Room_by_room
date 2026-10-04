@@ -1,0 +1,49 @@
+Sprint 2B — free-preview rehearsal transcript (local stand-in, 4 October 2026)
+PostgreSQL 18.6 with TLS-only TCP (stand-in for Render free Postgres); Python 3.13.14; fresh venv built with the exact build command.
+Credentials were generated per run and are not recorded here. No paid calls; no real receipts or photos.
+
+== build commit: cd5c3ea Fix sideways scrolling of two-column date fields on high-density phones
+== start command: python manage.py migrate --noinput && gunicorn config.wsgi --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+== migrations applied at start: 24; Using worker: sync; workers booted: 1
+== app DB connection over TLS: true TLSv1.3
+== create_owner alistair (founder-machine method: external-style URL, PGSSLMODE=require, password typed at prompts)
+[prompt answered]
+[prompt answered]
+Created owner account 'alistair' with no data.
+exit status: 0
+== create_owner intruder (founder-machine method: external-style URL, PGSSLMODE=require, password typed at prompts)
+[prompt answered]
+[prompt answered]
+Created owner account 'intruder' with no data.
+exit status: 0
+== walkthrough through local TLS proxy (stand-in for Render's HTTPS edge)
+[PASS] health check /healthz/ over plain HTTP — 200 {"status": "ok"}
+[PASS] plain HTTP is redirected to HTTPS — 301 → https://localhost/
+[PASS] anonymous visitor is sent to sign-in — https://localhost:10443/account/sign-in/?next=/
+[PASS] HSTS header on HTTPS responses — max-age=2592000
+[PASS] static CSS served by WhiteNoise with a hashed name — /static/css/app.772ca247ec80.css 200 cache-control=max-age=315360000, public, immutable
+[PASS] session cookie is Secure and HttpOnly
+[PASS] owner can open the private project photo — /projects/photos/12fba21e-7895-41ae-8c6b-16251ed3473e/file/ 200
+[PASS] missing API key: automatic reading is reported as not configured — ['Automatic extraction not configured. Enter the details from the receipt.'] read buttons=0
+[PASS] owner can open the private receipt file — /receipts/file/1bab5df5-a6af-46ff-b896-e576801b746b/
+[PASS] reconciliation flags a mismatch before confirming — £0.50 of the total is not itemised yet. Add missing items or correct the amounts.
+[PASS] server refuses an unreconciled purchase and keeps the entries — Nothing was recorded. Items add up to £12.50 but the purchase total is £13.00. Add missing items or correct the amounts.
+[PASS] reconciliation matches after correction — Matches total
+[PASS] manual receipt confirmed into a purchase — https://localhost:10443/costs/purchases/51a16076-c6d0-4d2c-b320-630d7e0e4e6e/
+[PASS] repeat confirmation returns the same purchase — https://localhost:10443/costs/purchases/51a16076-c6d0-4d2c-b320-630d7e0e4e6e/
+[PASS] cost totals count the purchase once — total £12.50; Preview kitchen £12.50 of £500 budget
+[PASS] no sideways scrolling at 390 px, DPR 3 (17 pages)
+[PASS] anonymous request for the receipt is redirected to sign-in — 302
+[PASS] anonymous request for the photo is redirected to sign-in — 302
+[PASS] another account gets 404 for the receipt — 404
+[PASS] another account gets 404 for the photo — 404
+[PASS] another account gets 404 for the purchase — 404
+
+21 of 21 checks passed.
+== database after walkthrough
+purchases (all) | 1
+confirmed purchases | 1
+stored private files (database storage) | 3 | 25889 bytes
+receipt drafts | confirmed | 1
+receipt drafts | draft | 1
+extraction jobs | 0

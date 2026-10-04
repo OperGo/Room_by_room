@@ -1,8 +1,31 @@
-# Deployment plan — Render (prepared, NOT deployed)
+# Deployment plan — Render (paid plan prepared, NOT applied)
 
-Target: the founder's existing Render project **"Room by Room"**. Nothing has been created, deployed or paid
-for. `render.yaml` in the repository root is a Blueprint ready for review; applying it creates paid resources.
-Resource creation, deployment and live API spending need explicit founder approval.
+Target: the founder's existing Render project **"Room by Room"**. `render.yaml` in the repository root is a
+Blueprint for the **paid** plan, ready for review. Applying it creates paid resources. Resource creation,
+deployment and live API spending need explicit founder approval. The paid hosting and the API budget are
+**not yet approved**.
+
+## Current state: founder-created free preview (October 2026)
+
+The founder has created a **free web service** and a **free PostgreSQL database** in the "Room by Room"
+project. Their first deploy failed. Use these resources for a preview, following
+**`docs/deployment-render-free-preview.md`** (founder-applied checklist, owner creation without a Shell, free
+limits, manual backups). Do not apply the paid Blueprint or create replacements while the preview runs.
+
+**Before any future Blueprint application, account for these existing resources first.** A Blueprint creates
+resources by name, so applying `render.yaml` unchanged could create a second web service and a second
+database next to the free ones. Decide between:
+
+- **Upgrade in place:** change the free service and database to paid instance types in the dashboard, and
+  align the Blueprint's names and settings with them before syncing; or
+- **Migrate:** apply the Blueprint, copy the data with the manual `pg_dump`/`pg_restore` procedure, verify it
+  with `restore_fingerprint`, then retire the free resources.
+
+Also reconcile the PostgreSQL version: the Blueprint pins `"16"`, while the free database is probably 18.
+The application passes its full test suite on 16, 17 and 18. Never downgrade an existing database. Either
+choice needs a CTO decision and the official `render blueprints validate` run.
+
+The rest of this document is the **paid plan**.
 
 ## Sources and how they were checked
 

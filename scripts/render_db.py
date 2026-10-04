@@ -12,6 +12,7 @@ that nothing secret leaks while working with the Render database:
   any non-local host.
 
     python scripts/render_db.py create-owner alistair
+    python scripts/render_db.py change-password alistair
     python scripts/render_db.py backup --out ~/RoomByRoomBackups
     python scripts/render_db.py restore-check ~/RoomByRoomBackups/room-by-room-YYYY-MM-DD.dump
 
@@ -134,13 +135,23 @@ REMOTE_HINT = ("If it could not connect: check the pasted URL is the External on
                "temporary /32 inbound rule, and that the database is not expired.")
 
 
-def cmd_create_owner(args):
+def _remote_manage(command, username):
+    """Run an interactive account command against the Render database; passwords are typed at its prompts."""
     with RemoteDatabase() as db:
         print("Connecting with TLS required; the password is kept only in a temporary private file.")
         try:
-            run([sys.executable, "manage.py", "create_owner", args.username], db.env())  # password typed at its prompts
+            run([sys.executable, "manage.py", command, username], db.env())
         except HelperError as exc:
             raise HelperError(f"{exc} {REMOTE_HINT}") from None
+
+
+def cmd_create_owner(args):
+    _remote_manage("create_owner", args.username)
+
+
+def cmd_change_password(args):
+    # Django's built-in command: hidden prompts, password validators, refuses unknown usernames.
+    _remote_manage("changepassword", args.username)
 
 
 def cmd_backup(args):
@@ -212,6 +223,9 @@ def main(argv=None):
     p = sub.add_parser("create-owner", help="create the owner account (password typed at hidden prompts)")
     p.add_argument("username")
     p.set_defaults(func=cmd_create_owner)
+    p = sub.add_parser("change-password", help="set a new password for an existing account (hidden prompts)")
+    p.add_argument("username")
+    p.set_defaults(func=cmd_change_password)
     p = sub.add_parser("backup", help="fingerprint + pg_dump the Render database over TLS")
     p.add_argument("--out", required=True, help="private folder for the backup files")
     p.add_argument("--pg-bin", help="folder containing pg_dump (default: PATH)")

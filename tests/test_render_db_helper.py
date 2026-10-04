@@ -185,3 +185,31 @@ def test_backup_failure_keeps_unrelated_earlier_backups(backup_env):
     with pytest.raises(render_db.HelperError):
         render_db.cmd_backup(args)
     assert _outputs(out) == ["room-by-room-2026-09-01.dump", "room-by-room-2026-09-01.fingerprint.json"]
+
+
+# ------------------------------------------------------------------ change-password (hosted support)
+
+
+@pytest.mark.parametrize("command, managed", [("create-owner", "create_owner"), ("change-password", "changepassword")])
+def test_account_commands_run_interactively_without_the_password(remote, tmpdirs, monkeypatch, command, managed):
+    calls = []
+
+    def fake_run(args, env, **kwargs):
+        calls.append(args)
+        assert SECRET not in " ".join(args) and all(SECRET not in v for v in env.values())
+        assert env["PGSSLMODE"] == "require" and os.path.exists(env["PGPASSFILE"])
+
+    monkeypatch.setattr(render_db, "run", fake_run)
+    assert render_db.main([command, "alistair"]) == 0
+    assert calls == [[render_db.sys.executable, "manage.py", managed, "alistair"]]  # no password argument
+    assert not os.path.exists(tmpdirs[0])
+
+
+def test_change_password_failure_cleans_up_and_hints(remote, tmpdirs, monkeypatch, capsys):
+    def failing_run(args, env, **kwargs):
+        raise render_db.HelperError("python manage.py failed (exit 1).")
+
+    monkeypatch.setattr(render_db, "run", failing_run)
+    assert render_db.main(["change-password", "alistair"]) == 1
+    assert "temporary /32 inbound rule" in capsys.readouterr().err
+    assert not os.path.exists(tmpdirs[0])

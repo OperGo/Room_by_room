@@ -170,6 +170,16 @@ All database work goes through `scripts/render_db.py`. It does the following:
 3. **Remove your `/32` rule.** In the different-region case, leave the service's rules in place.
 4. Check `https://<service>.onrender.com/healthz/` → `{"status": "ok"}`, then sign in on the iPhone.
 
+## Forgotten password
+
+The app has no "forgot password" link (there is no email or signup). Reset it from your computer:
+
+1. Add **only your `/32`** to the database's inbound IP rules.
+2. Run `python scripts/render_db.py change-password alistair`.
+   1. Paste the External Database URL (hidden).
+   2. Type the new password twice (hidden; same rules as account creation).
+3. Remove your `/32`, then check `/healthz/` → `{"status": "ok"}`.
+
 ## Preview limits (free plan)
 
 - **Spin-down:** the service sleeps after 15 minutes without traffic.

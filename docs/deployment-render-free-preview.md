@@ -199,6 +199,11 @@ The app has no "forgot password" link (there is no email or signup). Reset it fr
 
 ## Manual backup and restore (free database)
 
+> **Founder decision (4 October 2026), accepted by the CTO:** the preview holds disposable test data, so no
+> manual backups or restore checks are taken while that remains true. The procedure below is kept for when
+> real data must be preserved, and it no longer applies after the in-place upgrade to a paid database (which
+> has managed backups).
+
 Free Postgres has no managed backups. Take one **weekly** and **always before the expiry date** or any plan
 change.
 

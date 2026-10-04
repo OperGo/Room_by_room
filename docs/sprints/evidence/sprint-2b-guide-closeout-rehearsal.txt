@@ -1,0 +1,127 @@
+Sprint 2B guide closeout — rehearsal of the published founder commands (4 October 2026)
+
+Stand-ins (local, fictional data, no paid calls):
+- Render free Postgres: PostgreSQL 18.6, TCP only through hostssl (TLS) rules = the database's inbound IP rules; reload after each change.
+- Render private network (Internal URL): Unix socket, not subject to the IP rules.
+- Founder's public IP: TCP relay connecting from 127.0.0.2. Service outbound range: TCP relay connecting from 127.0.0.3.
+- Founder's laptop PostgreSQL for restore-check: PostgreSQL 18.6 on localhost:5435 WITHOUT TLS.
+- Service: the exact free-preview start command from a fresh build of cd5c3ea (application code unchanged since), restarted after each rule change so it opens fresh DB connections.
+- Founder commands ran in fresh shells: env -i FOUNDER_SESSION=1 HOME TERM PATH=<venv>:<pg18 client> bash --noprofile --norc.
+- Hidden prompts were answered through a pseudo-terminal from a 0600 answers file (so the harness never put secrets in arguments or environment).
+- Leak monitor: sampled /proc/*/cmdline and /proc/*/environ of every founder-session process every ~20 ms for the database password and the owner password.
+
+=============== CASE A: same region — service uses the INTERNAL URL; external access normally blocked
+inbound rules now: <none: external access blocked>
+service /healthz/: 200 {"status": "ok"}
+founder direct connection: psql: error: connection to server at "127.0.0.1", port 6002 failed: FATAL:  no pg_hba.conf entry for host "127
+
+### A1. Founder adds ONLY their /32 (temporary)
+inbound rules now: 127.0.0.2/32
+founder direct connection: connected from 127.0.0.2/32
+
+### A2. Fresh shell: python scripts/render_db.py create-owner alistair
+Paste the database's External Database URL (input hidden), then press Enter: 
+Connecting with TLS required; the password is kept only in a temporary private file.
+Password: 
+Password (again): 
+Created owner account 'alistair' with no data.
+[exit status 0]
+leftover settings in founder shell: []
+leftover temp passfiles: []
+Created owner account 'intruder' with no data.
+[exit status 0]
+
+### A2b. Phone walkthrough against the service (owner created by the helper)
+21 of 21 checks passed.
+
+### A3. Fresh shell: python scripts/render_db.py backup --out <scratch>/backups
+Stop using the app (phone and browser) until this finishes, so the copy is consistent. Ready? [y/N] y
+Paste the database's External Database URL (input hidden), then press Enter: 
+Backup written: <scratch>/backups/room-by-room-2026-10-04.dump (99,442 bytes) and its fingerprint. Keep both private (encrypted storage). Files: 3; confirmed purchases: 1.
+[exit status 0]
+leftover settings in founder shell: []
+leftover temp passfiles: []
+-rw------- 99442 room-by-room-2026-10-04.dump
+-rw------- 932 room-by-room-2026-10-04.fingerprint.json
+
+### A4. Founder removes their /32
+inbound rules now: <none: external access blocked>
+founder direct connection: psql: error: connection to server at "127.0.0.1", port 6002 failed: FATAL:  no pg_hba.conf entry for host "127
+service /healthz/: 200 {"status": "ok"}
+
+### A5. Same fresh-shell pattern: restore-check into the laptop PostgreSQL WITHOUT TLS
+IDENTICAL: restored copy in local database 'rbr_restore' matches the backup (3 files, 1 confirmed purchases). Delete it when done: dropdb rbr_restore
+leftover settings in founder shell: []
+leftover temp passfiles: []
+
+=============== CASE B: different regions — service uses the EXTERNAL URL + PGSSLMODE=require
+
+### B0. Service outbound range is a retained rule
+inbound rules now: 127.0.0.3/32
+service /healthz/: 200 {"status": "ok"}
+founder direct connection: psql: error: connection to server at "127.0.0.1", port 6002 failed: FATAL:  no pg_hba.conf entry for host "127
+
+### B1. Founder ADDS their /32 alongside the service rule
+inbound rules now: 127.0.0.3/32 127.0.0.2/32
+founder direct connection: connected from 127.0.0.2/32
+Stop using the app (phone and browser) until this finishes, so the copy is consistent. Ready? [y/N] y
+Paste the database's External Database URL (input hidden), then press Enter: 
+Backup written: <scratch>/backups-b/room-by-room-2026-10-04.dump (99,442 bytes) and its fingerprint. Keep both private (encrypted storage). Files: 3; confirmed purchases: 1.
+[exit status 0]
+leftover settings in founder shell: []
+leftover temp passfiles: []
+
+### B2. Founder removes ONLY their /32
+inbound rules now: 127.0.0.3/32
+founder direct connection: psql: error: connection to server at "127.0.0.1", port 6002 failed: FATAL:  no pg_hba.conf entry for host "127
+service /healthz/: 200 {"status": "ok"}
+IDENTICAL: restored copy in local database 'rbr_restore_b' matches the backup (3 files, 1 confirmed purchases). Delete it when done: dropdb rbr_restore_b
+
+### B3. Negative control (the mistake the guide forbids): replace all rules with the founder's IP
+inbound rules now: 127.0.0.2/32
+service /healthz/: 000 
+inbound rules now: 127.0.0.3/32
+(service rule restored)
+service /healthz/: 200 {"status": "ok"}
+
+=============== FAILURE CLEAN-UP (founder rule open while testing)
+inbound rules now: 127.0.0.3/32 127.0.0.2/32
+
+### F1. Wrong password in the pasted URL
+password retrieved from file "/tmp/rbr-98ardy5x/pgpass"
+Stopped: python manage.py failed (exit 1). If it could not connect: check the pasted URL is the External one, that your current IP has a temporary /32 inbound rule, and that the database is not expired.
+[exit status 1]
+leftover settings in founder shell: []
+leftover temp passfiles: []
+
+### F2. SIGTERM while create_owner waits at its password prompt (passfile exists at that moment)
+Password:
+[exit status 143]
+leftover settings in founder shell: []
+leftover temp passfiles: []
+
+### F3. Ctrl+C (SIGINT) at the same point
+Cancelled. Temporary connection details were deleted.
+[exit status 130]
+leftover settings in founder shell: []
+leftover temp passfiles: []
+
+### F4. pg_dump too old for the server (pg_dump 16 vs PostgreSQL 18): partial export removed
+pg_dump: error: aborting because of server version mismatch
+pg_dump: detail: server version: 18.6; pg_dump version: 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
+Stopped: pg_dump --format=custom failed (exit 1).
+[exit status 1]
+files left in backups-f: []
+leftover settings in founder shell: []
+leftover temp passfiles: []
+inbound rules now: 127.0.0.3/32
+
+### F5. OLD guide pattern, for contrast: exports persist and break the local no-TLS restore
+createdb: error: connection to server at "localhost" (127.0.0.1), port 5435 failed: server does not support SSL, but SSL was required
+dropdb: error: connection to server at "localhost" (127.0.0.1), port 5435 failed: server does not support SSL, but SSL was required
+(same shell, explicit local settings as restore-check uses:) created
+
+### Leak monitor
+monitor: 3170 samples; 42 founder-session processes seen; 0 cmdline/environ containing the secret
+(owner password) monitor: 3170 samples; 42 founder-session processes seen; 0 cmdline/environ containing the secret
+restored local DBs: rbr_restore, rbr_restore_b

@@ -21,7 +21,8 @@ Only `sprint-2a` contains the deployable code, checked on the remote branches on
 
 ## Before you start: read these from the dashboard (I have no Render access)
 
-Write these down; the report asks for them back. **None of them are secrets.**
+Check these yourself. Afterwards, send back only: **service URL, service and database regions, PostgreSQL
+version and expiry date.** None of these are secrets. Never send URLs containing passwords.
 
 | Where | Field |
 |---|---|
@@ -29,14 +30,17 @@ Write these down; the report asks for them back. **None of them are secrets.**
 | Web service → Settings | Repository; branch; Build command; Start command; Auto-Deploy |
 | Database → Info | Database name; ID (`dpg-…`); **region**; **PostgreSQL version**; created date and the **expiry date** shown for free databases; storage (1 GB) |
 | Database → Networking / Access Control | The current inbound IP rules (who may connect from outside Render) |
+| Web service → Connect → Outbound | Only if the regions differ: the service's outbound IP ranges |
 
 **Two checks before deploying:**
 
-1. **Same region.** The service and the database must be in the same region for the database's
-   *Internal* URL to work.
-   - If they differ, do **not** replace either. Use the database's **External** URL as `DATABASE_URL` and
-     add `PGSSLMODE=require` to the service. This works because the connection then goes over TLS (rehearsed
-     locally). Expect slightly slower pages, and report it.
+1. **Same region?** Compare the service's and the database's regions.
+   - **Same region (expected):** the service uses the database's **Internal** URL. It connects over Render's
+     private network, so the database's inbound IP rules do not affect it.
+   - **Different regions:** do **not** replace either resource. The service must use the **External** URL
+     with `PGSSLMODE=require`, and the database must allow the service's outbound addresses (see "Database
+     access rules" below). If you cannot find those outbound ranges, stop and report it. Never open
+     `0.0.0.0/0`.
 2. **PostgreSQL version.** The application and its full test suite were checked on PostgreSQL **16.14,
    17.11 and 18.6**. A new free database most likely runs 18 (Render's current default).
    - 16, 17 or 18: go ahead.
@@ -73,7 +77,7 @@ variable directly on the service.
 | `PYTHON_VERSION` | `3.13.14` |
 | `DJANGO_SECRET_KEY` | **Private.** Use Render's "Generate" button for the value, or paste the output of `python3 -c "import secrets; print(secrets.token_urlsafe(50))"` run on your own machine. Never copy it anywhere else. |
 | `DJANGO_DEBUG` | `0` |
-| `DATABASE_URL` | **Private.** The existing database's **Internal Database URL** (Database → Connect → Internal). Use the External URL only in the different-region case above. |
+| `DATABASE_URL` | **Private.** The existing database's **Internal Database URL** (Database → Connect → Internal). Only in the different-region case: the External URL (with the access rules below). |
 | `PRIVATE_STORAGE_BACKEND` | `database` |
 | `STATIC_MANIFEST` | `1` |
 | `DJANGO_HTTPS` | `1` |
@@ -86,7 +90,8 @@ variable directly on the service.
 - There is no receipt worker in this preview. Do not add one: no worker inside Gunicorn, no background
   threads, no fake extractor.
 - Render sets `RENDER_EXTERNAL_HOSTNAME` itself, so the `onrender.com` address is allowed automatically.
-- Add `PGSSLMODE=require` **only** in the different-region case.
+- Add `PGSSLMODE=require` to the service **only** in the different-region case (External URL).
+- Never add `DJANGO_ALLOW_INSECURE_KEY` to the service. It is only for the local helper commands below.
 
 ### D. Deploy
 1. Save the settings, then **Manual Deploy**.
@@ -96,43 +101,74 @@ variable directly on the service.
 4. Open `https://<service>.onrender.com/healthz/`. Expect `{"status": "ok"}`.
 5. Open the root address. Expect the sign-in page; there is no signup.
 
+## Database access rules (inbound IP rules)
+
+External connections to the database are controlled under **Database → Networking → Access Control**
+(inbound IP rules). The rules you need depend on the region case.
+
+**Same region (service uses the Internal URL).**
+- The service needs **no** inbound rule.
+- Keep external access closed. Add only **your own `/32` temporarily**, while creating the account or
+  taking a backup. Then remove that rule.
+
+**Different regions (service uses the External URL).**
+- Find the service's outbound addresses at **Web service → Connect → Outbound**.
+- Add each listed range as an inbound rule on the database. **Keep these rules permanently**: without them
+  the app cannot reach its database.
+- If the Outbound tab is missing, or you cannot tell which ranges to use, **stop this fallback and report
+  it**. Do not guess, and do not open `0.0.0.0/0`.
+- Add and remove **only your own `/32`** around account setup and backups. Never replace or clear the
+  service's ranges.
+
+In both cases:
+- Never use `0.0.0.0/0`.
+- If the rules currently contain `0.0.0.0/0`, **first** add the rules this case needs (your `/32`, plus the
+  service's outbound ranges if regions differ). Then remove `0.0.0.0/0`, and record that you changed it.
+- After removing your `/32`, open `https://<service>.onrender.com/healthz/` and expect `{"status": "ok"}`.
+  That page checks the database, so it proves the service still has access.
+
+Your current public IP is shown by the dashboard's "Add my IP" option or by `curl -s https://checkip.amazonaws.com`.
+Write it as `x.x.x.x/32`.
+
+## Your computer: one-off setup (macOS)
+
+- Install Python 3.13 (python.org installer or `brew install python@3.13`).
+- For backups, also install the PostgreSQL client tools of the **same major version as the database or
+  newer**, for example `brew install postgresql@18` or Postgres.app.
+- Then clone the repository and install its dependencies:
+
+```bash
+git clone https://github.com/OperGo/Room_by_room.git && cd Room_by_room
+git checkout sprint-2a                     # the commit you deployed
+python3.13 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+All database work goes through `scripts/render_db.py`. It does the following:
+- asks for the **External Database URL at a hidden prompt**, so the URL is never typed into a command or
+  saved in shell history;
+- puts the password only in a temporary private file (permission 0600, `PGPASSFILE`). The file is deleted
+  on success, on error, on Ctrl+C and on termination, and the password never appears in any process's
+  arguments;
+- gives its temporary settings only to the commands it starts, so **nothing is left behind in your
+  shell**. These settings are `PGSSLMODE=require` (TLS for every remote connection) and
+  `DJANGO_ALLOW_INSECURE_KEY=1` (lets local management commands run without the service's secret key);
+- **never** asks you to `export` anything.
+
 ## Creating the owner account (no Render Shell on free services)
 
-Run the interactive `create_owner` command **once** from your own trusted computer, connected to the
-database's **External** URL over TLS. The password is typed only at the hidden prompts: never in a command,
-file, chat or report.
-
-1. **One-off setup (macOS):**
-   - Install Python 3.13 (python.org installer or `brew install python@3.13`).
-   - Clone the repository and install dependencies:
-     ```bash
-     git clone https://github.com/OperGo/Room_by_room.git && cd Room_by_room
-     git checkout sprint-2a          # the same commit you deployed
-     python3.13 -m venv .venv && source .venv/bin/activate
-     pip install -r requirements.txt
-     ```
-2. **Allow your computer only.** Open Database → Networking → Access Control (inbound IP rules).
-   - If anything broader than your own address is allowed (for example `0.0.0.0/0`), replace it with **only
-     your current public IP** (the dashboard offers "Add my IP", or use the address shown by
-     `curl -s https://checkip.amazonaws.com`), as `x.x.x.x/32`.
-   - If external access is already blocked, add only that `/32` rule.
-3. **Create the account** in the same terminal:
+1. Add **only your `/32`** to the database's inbound IP rules ("Database access rules" above).
+2. Run this in the `Room_by_room` folder, with the virtualenv active:
    ```bash
-   read -rs DATABASE_URL     # paste the External Database URL, press Enter (hidden, not saved in history)
-   export DATABASE_URL PGSSLMODE=require DJANGO_DEBUG=0 DJANGO_ALLOW_INSECURE_KEY=1
-   python manage.py create_owner alistair
-   # Password: ••••••   Password (again): ••••••
-   unset DATABASE_URL
+   python scripts/render_db.py create-owner alistair
    ```
-   - `PGSSLMODE=require` forces TLS. The app's `DATABASE_URL` parser ignores `?sslmode=` in the URL, but the
-     PostgreSQL driver honours this variable. It was rehearsed: a server without TLS is refused.
-   - `DJANGO_ALLOW_INSECURE_KEY=1` only lets the command start without the service's secret key. Password
-     hashing does not use the secret key, so the service's key never needs to leave Render.
-   - The command refuses an existing username, mismatched entries and weak passwords (Django's validators).
-     It creates an empty account.
-4. **Close external access** by removing your `/32` rule, so nothing outside Render can connect. Reopen it
-   the same way only for backups.
-5. Sign in on the iPhone at the `onrender.com` address.
+   1. Paste the **External Database URL** when asked. Nothing is shown.
+   2. Type the new password twice at the hidden `Password:` prompts.
+   - It refuses an existing username, mismatched entries and weak passwords (10+ characters, Django's
+     validators), and it creates an empty account.
+   - Password hashing does not use the service's secret key, so that key stays in Render.
+3. **Remove your `/32` rule.** In the different-region case, leave the service's rules in place.
+4. Check `https://<service>.onrender.com/healthz/` → `{"status": "ok"}`, then sign in on the iPhone.
 
 ## Preview limits (free plan)
 
@@ -152,37 +188,37 @@ file, chat or report.
 
 ## Manual backup and restore (free database)
 
-Use your own computer. Open your `/32` rule as in "Creating the owner account" step 2, and close it again
-afterwards.
+Free Postgres has no managed backups. Take one **weekly** and **always before the expiry date** or any plan
+change.
 
-**Version rule:** your `pg_dump` must be the **same major version as the database or newer**. Rehearsed:
-pg_dump 16 refused a PostgreSQL 18 server with "server version mismatch". Install the matching client, for
-example `brew install postgresql@18`, or Postgres.app.
+1. **Pause editing.** Close the app on your phone and in any browser until the backup finishes. The helper
+   fingerprints the data before and after the export. If anything changed in between, it deletes the export
+   and asks you to run it again.
+2. Add **only your `/32`** to the database's inbound IP rules.
+3. Run:
+   ```bash
+   python scripts/render_db.py backup --out ~/RoomByRoomBackups
+   ```
+   1. Confirm with `y`.
+   2. Paste the External Database URL when asked (hidden).
 
-1. **Fingerprint the live data.** It holds counts, hashes and totals only, no content:
+   It writes `room-by-room-YYYY-MM-DD.dump` and `room-by-room-YYYY-MM-DD.fingerprint.json`, both readable
+   only by you. Keep them **private, on encrypted storage**: the dump contains your receipts and photos. If
+   your `pg_dump` is older than the server, it stops with "server version mismatch" and leaves no partial
+   file. Install the matching client tools and retry (or point `--pg-bin` at them).
+4. **Remove your `/32` rule.** Check `/healthz/` → `{"status": "ok"}`.
+5. **Restore test** into an **isolated local** PostgreSQL of the same major version. No Render resources
+   and no network are involved:
    ```bash
-   read -rs DATABASE_URL; export DATABASE_URL PGSSLMODE=require DJANGO_DEBUG=0 DJANGO_ALLOW_INSECURE_KEY=1 PRIVATE_STORAGE_BACKEND=database
-   python manage.py restore_fingerprint > before.json
+   python scripts/render_db.py restore-check ~/RoomByRoomBackups/room-by-room-YYYY-MM-DD.dump
    ```
-2. **Dump.** Keep the file only on encrypted storage; it contains your receipts and photos:
-   ```bash
-   pg_dump -Fc --no-owner --no-acl -f "room-by-room-$(date +%F).dump" "$DATABASE_URL"
-   unset DATABASE_URL
-   ```
-3. **Restore test** into an isolated local PostgreSQL of the same major version. No Render resources are
-   needed:
-   ```bash
-   createdb rbr_restore
-   pg_restore --no-owner --no-acl --exit-on-error -d rbr_restore room-by-room-YYYY-MM-DD.dump
-   DATABASE_URL=postgres://localhost/rbr_restore PRIVATE_STORAGE_BACKEND=database DJANGO_DEBUG=1 \
-     python manage.py restore_fingerprint > after.json
-   diff before.json after.json && echo IDENTICAL
-   ```
-   Then delete the local copy (`dropdb rbr_restore`) if it is no longer needed.
-
-Do this **weekly**, and **always before the expiry date** or any plan change. Rehearsed locally on
-PostgreSQL 18.6: fingerprints were identical (3 files, total £12.50, 1 confirmed purchase). Evidence:
-`docs/sprints/evidence/sprint-2b-backup-restore.txt`.
+   - It uses explicit local settings (`localhost:5432`, your user name, TLS *preferred*), independent of
+     anything used for the remote database. Change them with `--host`, `--port`, `--user` or `--db` if
+     needed.
+   - It refuses non-local hosts and refuses to restore over an existing database.
+   - It prints `IDENTICAL` when the restored copy matches the backup's fingerprint: same file contents,
+     totals and row counts.
+   - Delete the copy afterwards with `dropdb rbr_restore`.
 
 ## What was rehearsed locally (and what was not)
 
@@ -203,6 +239,17 @@ The results (evidence: `docs/sprints/evidence/sprint-2b-free-preview-rehearsal.t
 - 17 pages showed no sideways scrolling at 390 px and an iPhone-like pixel density.
 - The full test suite passes on PostgreSQL 16, 17 and 18.
 
+The helper and access rules were rehearsed from fresh shells with the published commands (evidence:
+`docs/sprints/evidence/sprint-2b-guide-closeout-rehearsal.txt`). Local stand-ins played the founder's IP,
+the service's outbound range and a laptop PostgreSQL without TLS. Both region cases passed:
+- Adding and removing the founder's temporary `/32` left the service healthy.
+- Replacing all rules with the founder's IP broke the external-URL service, which is why the guide forbids
+  it.
+- Owner creation, backup and restore checks were identical across runs.
+- No settings were left in the shell, and no temporary passfile was left after a wrong password, SIGTERM,
+  Ctrl+C or a too-old `pg_dump`.
+- No founder-side process ever had the password in its arguments or environment.
+
 A local TLS proxy stood in for Render's HTTPS edge. **Not verified:** Render's own build, proxy, health
 check, spin-down and the founder's actual database. These depend on the founder applying this checklist.
 
@@ -220,7 +267,9 @@ check, spin-down and the founder's actual database. These depend on the founder 
 6. Costs: the total equals the receipt, counted once. The project shows the same net cost.
 7. Tap "Open original" on the receipt and open the project photo. Both should display.
 8. Sign out, then try a bookmarked receipt link. Expect the sign-in page, not the file.
-9. Report back:
+9. Report back (no secrets):
+   - the service URL;
+   - the service and database regions;
+   - the PostgreSQL version and the expiry date;
    - anything slow (note wake-ups separately);
-   - anything that looks wrong on the phone;
-   - the dashboard fields from "Before you start".
+   - anything that looks wrong on the phone.

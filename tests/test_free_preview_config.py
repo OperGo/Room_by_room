@@ -25,6 +25,18 @@ def test_checklist_has_the_exact_commands_and_settings():
     assert not re.search(r"sk-ant-|postgres(ql)?://[^\s:/]+:[^\s@]+@[a-z0-9-]+\.", DOC)  # no credentials
 
 
+def test_guide_never_leaks_settings_or_passwords():
+    # Sprint 2B closeout: no exported remote settings, no password-bearing URL in arguments, no open world.
+    assert not re.search(r"^\s*export\b", DOC, re.M)
+    assert "$DATABASE_URL" not in DOC and "read -rs" not in DOC
+    assert "0.0.0.0/0" in DOC and "Never use `0.0.0.0/0`" in DOC
+    for command in ("python scripts/render_db.py create-owner alistair",
+                    "python scripts/render_db.py backup --out", "python scripts/render_db.py restore-check"):
+        assert command in DOC
+    assert "Web service → Connect → Outbound" in DOC and "Keep these rules permanently" in DOC
+    assert "Never add `DJANGO_ALLOW_INSECURE_KEY` to the service" in DOC
+
+
 def test_deployable_code_is_present():
     requirements = (ROOT / "requirements.txt").read_text().lower()
     assert "gunicorn==" in requirements and "whitenoise==" in requirements

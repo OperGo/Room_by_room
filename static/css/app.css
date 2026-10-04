@@ -430,6 +430,10 @@ h1 { font-weight: 750; letter-spacing: -0.02em; }
 .sticky-cta { position: sticky; bottom: calc(var(--nav-h) + 10px + env(safe-area-inset-bottom)); z-index: 6; margin-top: 18px; }
 .sticky-cta::before { content: ""; position: absolute; inset: -14px -20px -12px; background: linear-gradient(to top, var(--bg) 65%, rgba(247,245,240,0)); z-index: -1; }
 @media (min-width: 1024px) { .sticky-cta { bottom: 16px; } }
+/* Home account row (phones/tablets): below the sticky receipt button, clear of the bottom navigation. */
+.account-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line); }
+.account-row p { margin: 0; overflow-wrap: anywhere; }
 
 /* project cards */
 .hero-card { border-radius: 18px; background: var(--surface); }

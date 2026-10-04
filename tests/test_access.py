@@ -154,3 +154,26 @@ def test_healthz_is_public_and_reveals_nothing(client, owner_records):
     response = client.get("/healthz/")
     assert response.status_code == 200 and response.json() == {"status": "ok"}
     assert b"Private office" not in response.content
+
+
+# ------------------------------------------------------------------ Sprint 2B: phone sign-out on Home
+
+
+def test_home_has_phone_account_row_with_post_csrf_sign_out(client_owner, owner):
+    body = client_owner.get(reverse("core:home")).content.decode()
+    row = body[body.index('class="account-row mobile-only"'):]
+    row = row[:row.index("</section>")]
+    assert f"Signed in as <strong>{owner.username}</strong>" in row
+    assert f'<form method="post" action="{reverse("accounts:logout")}">' in row
+    assert 'name="csrfmiddlewaretoken"' in row and 'type="submit"' in row and "Sign out" in row
+    assert body.count(f'action="{reverse("accounts:logout")}"') == 2  # sidebar (desktop) + Home row (phones)
+
+
+def test_sign_out_needs_post_and_csrf(owner):
+    from django.test import Client
+
+    c = Client(enforce_csrf_checks=True)
+    c.force_login(owner)
+    assert c.get(reverse("accounts:logout")).status_code == 405  # a GET never signs out
+    assert c.post(reverse("accounts:logout")).status_code == 403  # no CSRF token
+    assert c.get(reverse("core:home")).status_code == 200  # still signed in

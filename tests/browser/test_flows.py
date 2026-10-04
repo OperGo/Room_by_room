@@ -400,3 +400,74 @@ def test_returned_editor_blocks_retry_until_saved(phone, live_server, owner, set
     phone.get_by_role("button", name="Try reading again").click()
     expect(phone.get_by_text("Waiting to read the receipt…")).to_be_visible()
     assert ExtractionJob.objects.count() == 2
+
+
+# ------------------------------------------------------------------ Sprint 2B: phone sign-out
+
+
+def _visible_and_unobstructed(page, locator):
+    """True if the element's centre is the element itself (not covered by the nav or sticky button)."""
+    locator.scroll_into_view_if_needed()
+    return locator.evaluate("""el => { const r = el.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return r.width > 0 && r.height > 0 && (hit === el || el.contains(hit)); }""")
+
+
+def test_phone_sign_out_from_home_ends_the_session(browser, live_server, owner):
+    from django.urls import reverse
+
+    project, draft = _reading_draft(owner)
+    receipt_url = f"{live_server.url}{reverse('receipts:file', args=[draft.document.uuid])}"
+    context = browser.new_context(viewport=PHONE, device_scale_factor=3, has_touch=True, is_mobile=True)
+    page = context.new_page()
+    sign_in(page, live_server)
+    assert page.request.get(receipt_url).status == 200  # owner can open the private file while signed in
+    page.goto(f"{live_server.url}/projects/{project.uuid}/")
+    page.locator("nav.bottom-nav").get_by_text("Home").click()
+    expect(page.locator("nav.bottom-nav a[aria-current=page]")).to_have_text("Home")
+    row = page.locator("section.account-row")
+    button = row.get_by_role("button", name="Sign out")
+    expect(row.get_by_text("Signed in as")).to_be_visible()
+    expect(button).to_be_visible()
+    box = button.bounding_box()
+    assert box["height"] >= 44 and box["width"] >= 44
+    assert _visible_and_unobstructed(page, button)  # clear of bottom nav and sticky "Add a receipt"
+    nav_top = page.locator("nav.bottom-nav").bounding_box()["y"]
+    cta = page.locator(".sticky-cta .btn").bounding_box()
+    box = button.bounding_box()
+    assert box["y"] + box["height"] <= nav_top and (box["y"] >= cta["y"] + cta["height"] or box["y"] + box["height"] <= cta["y"])
+    # Keyboard focus is visible on the control.
+    page.evaluate("document.activeElement && document.activeElement.blur()")
+    for _ in range(80):
+        page.keyboard.press("Tab")
+        if button.evaluate("el => el === document.activeElement"):
+            break
+    assert button.evaluate("el => el === document.activeElement")
+    assert button.evaluate("el => getComputedStyle(el).outlineStyle") != "none"
+    assert no_horizontal_scroll(page)
+    button.click()
+    page.wait_for_url("**/account/sign-in/**")
+    # Same browser context: the session has ended, so the private receipt file now needs sign-in.
+    page.goto(receipt_url)
+    assert "/account/sign-in/" in page.url
+    expect(page.locator("#id_username")).to_be_visible()
+    page.goto(f"{live_server.url}/")
+    assert "/account/sign-in/" in page.url
+    context.close()
+
+
+def test_desktop_keeps_sidebar_sign_out_and_hides_home_row(desktop, live_server, owner):
+    sign_in(desktop, live_server)
+    expect(desktop.locator("section.account-row")).to_be_hidden()
+    expect(desktop.locator("nav.side-nav").get_by_role("button", name="Sign out")).to_be_visible()
+
+
+def test_tablet_shows_home_sign_out(browser, live_server, owner):
+    context = browser.new_context(viewport={"width": 768, "height": 1024}, has_touch=True, is_mobile=True)
+    page = context.new_page()
+    sign_in(page, live_server)
+    button = page.locator("section.account-row").get_by_role("button", name="Sign out")
+    expect(button).to_be_visible()
+    assert _visible_and_unobstructed(page, button)
+    assert no_horizontal_scroll(page)
+    context.close()

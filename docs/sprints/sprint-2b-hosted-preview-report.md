@@ -72,7 +72,7 @@ Failed tests, untested behaviour and limitations:
   - The only Sign out button is in `.side-nav` (templates/base.html), which static/css/app.css hides with `.side-nav { display: none; }` except at desktop widths.
   - The phone's bottom navigation has no sign-out.
   - Repro: sign in on an iPhone and look for Sign out on any page; there is none.
-  - Workaround: sign out from a desktop browser. Sessions otherwise persist on the phone.
+  - [Corrected after CTO review] No workaround was valid: signing out in a separate desktop browser does not end the phone's session. Fixed by the Home sign-out row (docs/sprints/sprint-2b-mobile-signout-report.md).
   - Security note: private files remain protected (step 6).
 - Not verified: spin-down and wake-up timing, and Render's own logs.
 

@@ -73,4 +73,11 @@
   </div>
 </div>
 <div class="sticky-cta"><a class="btn btn-wide" href="{% url 'receipts:new' %}">{% icon "camera" 24 %}Add a receipt</a></div>
+{# Phones/tablets have no sidebar, so the account row lives at the foot of Home (hidden at desktop widths). #}
+<section class="account-row mobile-only" aria-label="Account">
+  <p class="small muted">Signed in as <strong>{{ user.username }}</strong></p>
+  <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}
+    <button class="btn btn-secondary" type="submit">{% icon "log-out" 18 %}Sign out</button>
+  </form>
+</section>
 {% endblock %}

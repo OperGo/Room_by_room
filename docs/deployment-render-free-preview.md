@@ -276,7 +276,9 @@ check, spin-down and the founder's actual database. These depend on the founder 
    - Correct it, check that "Matches total" shows, and press Confirm purchase once.
 6. Costs: the total equals the receipt, counted once. The project shows the same net cost.
 7. Tap "Open original" on the receipt and open the project photo. Both should display.
-8. Sign out, then try a bookmarked receipt link. Expect the sign-in page, not the file.
+8. Copy a receipt's "Open original" link. Then, on the phone, go to Home, scroll to the bottom and tap
+   **Sign out** ("Signed in as …"). Open the copied link in the same browser: expect the sign-in page, not
+   the file. (On a laptop, Sign out is at the foot of the side menu.)
 9. Report back (no secrets):
    - the service URL;
    - the service and database regions;

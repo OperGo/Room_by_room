@@ -62,7 +62,8 @@ Checks actually run and results:
 - SQLite: `pytest` → 256 passed, 8 skipped.
 - PostgreSQL 16.14: 264 passed. A first run errored because the local server had stopped (container restart); after a restart, 264 passed.
 - PostgreSQL 18.6 (the deployed major version): 264 passed.
-- 7 new tests:
+- 5 new test functions. [Corrected in the Sprint 2C closeout: the original report said "7 new tests"; the
+  reviewed diff adds five test functions.]
   - only queued/due jobs are claimable, and a permanently failed job is never claimable again;
   - receipt_jobs reports tokens and the list-price cost (2000/600 tokens → US$0.0050) and leaks no merchant, file name or amount;
   - the worker announces claimable jobs at start;

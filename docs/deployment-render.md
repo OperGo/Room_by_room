@@ -5,8 +5,8 @@ There are **three separate procedures**. Do not mix them.
 | Procedure | Status | Applies to | Document |
 |---|---|---|---|
 | **Free preview** | Live at https://room-by-room.onrender.com/ (Sprint 2B, accepted) | The founder-created **free** web service and **free PostgreSQL 18** database (Frankfurt). Owner `alistair`, manual deploys, no API key or worker. | `docs/deployment-render-free-preview.md` |
-| **Receipt-reading pilot** | Prepared; **needs founder approval** | Adds **one Starter worker** (Frankfurt) next to the existing free resources, plus a private API key on the worker and the web service. US$7 for at most a month and a US$5 API limit. | `docs/receipt-pilot.md` |
-| **Future in-place upgrade** | Proposed; **needs separate approval before 2 November 2026** | Changes the **existing** web service and **existing PostgreSQL 18** database to paid instance types in the dashboard, keeping the URL, data, owner, secret and the pilot worker. About US$20.30/month before tax, API use and overages. | This document, "In-place upgrade" below |
+| **Receipt-reading pilot** | **Paused by founder** (4 October 2026). Checklist kept as an unapplied option; no spending approved | Adds **one Starter worker** (Frankfurt) next to the existing free resources, plus a private API key on the worker and the web service. US$7 for at most a month and a US$5 API limit. | `docs/receipt-pilot.md` |
+| **Future in-place upgrade** | **Paused by founder** (paid hosting paused, 4 October 2026). Would need separate approval; the free database expires 2 November 2026 | Changes the **existing** web service and **existing PostgreSQL 18** database to paid instance types in the dashboard, keeping the URL, data, owner, secret and the pilot worker. About US$20.30/month before tax, API use and overages. | This document, "In-place upgrade" below |
 
 **`render.yaml` is not any of these.** It is a Blueprint for a **separate, brand-new install**. It assumes:
 - a new PostgreSQL **16** database;
@@ -18,7 +18,10 @@ There are **three separate procedures**. Do not mix them.
 and a second database next to the existing ones. Use it only for a deliberate fresh install, after the
 official `render blueprints validate` run.
 
-## In-place upgrade (proposal; not approved)
+## In-place upgrade (proposal; paused by founder, not approved)
+
+The free preview continues as-is, with manual entry. The founder has decided that, while it holds disposable
+test data, no manual backups or restore checks are taken (see `docs/deployment-render-free-preview.md`).
 
 Proposed only if the receipt pilot proves useful, and before the free database expires on **2 November 2026**
 (Render deletes it after a 14-day grace period).

@@ -1,7 +1,12 @@
 # Live receipt-reading pilot: founder checklist (Sprint 2C)
 
-**Status:** prepared, **not approved or applied**. Nothing in this guide may be bought, created or deployed
-until the founder explicitly approves the pilot budget and has checked the Render dashboard quote.
+**Status: Paused by founder (4 October 2026).** The founder has paused paid hosting and live receipt
+reading. The free preview continues with manual receipt entry. This checklist is kept as an **unapplied
+option**:
+- no worker, API key, spending or live call is approved;
+- when reading resumes, cheaper options will be assessed before committing to a dedicated worker;
+- nothing in this guide may be bought, created or deployed without new explicit founder approval and a check
+  of the Render dashboard quote.
 
 **Goal:** prove live receipt reading through to accurate, confirmed costs on the existing preview
 (https://room-by-room.onrender.com/).
@@ -38,7 +43,10 @@ plan upgrade.
   "Try reading again".
 
 You can also see this for yourself:
-- The worker prints **`Claimable at start: N job(s)`** in its log when it starts.
+- The worker prints **`Claimable at start: N job(s)`** in its log when it starts. That count and its id list
+  are **capped at 20**; use `receipt_jobs` for the full list.
+- "Claimable" can include an **exhausted** job: one whose worker died mid-reading after its last allowed
+  attempt. The worker marks such a job **failed** ("did not finish in time") **without** calling the provider.
 - `python manage.py receipt_jobs`, run in the worker's **Shell**, lists exactly what a running worker would
   send. It shows only job numbers, statuses, timings and tokens: never merchants, amounts or file names.
 - The steps below start the worker **without** a key first. If anything were somehow queued, it would fail

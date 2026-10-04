@@ -51,7 +51,8 @@ python manage.py process_receipts --once --max-jobs 1
 - `--watch` processes **one job per iteration** and checks for shutdown before every claim: on SIGTERM/Ctrl+C
   the job in hand finishes, nothing new is claimed, and the worker exits without sleeping (idle waits are
   sliced into 0.2 s steps). `--once` still processes everything claimable (or `--max-jobs`).
-- On start the worker logs `Claimable at start: N job(s)`. `python manage.py receipt_jobs` (read-only) lists what
+- On start the worker logs `Claimable at start: N job(s)` (count and ids capped at 20). "Claimable" includes
+  expired-lease jobs with no attempts left; the worker marks those failed without calling the provider. `python manage.py receipt_jobs` (read-only) lists what
   a running worker would send now and recent jobs' attempts, timings, model, tokens and estimated list-price cost,
   without merchants, amounts or file names. Failed jobs are never claimed again.
 - Claim: `SELECT … FOR UPDATE SKIP LOCKED` on the oldest claimable job, stamp a fresh `claim_token`,

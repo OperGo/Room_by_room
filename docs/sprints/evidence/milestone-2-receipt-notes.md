@@ -19,4 +19,5 @@ Founder-reported results; no receipts, photos, merchants or amounts.
 
 ## Spend observations (founder-reported, 4 October 2026)
 - Anthropic `Room by Room` workspace: about US$0.01 consumed; US$4.99 remaining of the US$5.00 purchased.
-- Render "current usage" shown as US$1.69. Breakdown by service (cron vs database) and the cron job's age still to be confirmed; not yet a cron-only figure.
+- Render "current usage" of US$1.69 included the founder's **unrelated project**; it is not a Room by Room figure.
+- Cron job `room-by-room-receipts` alone: **US$0.01** so far. Elapsed period still to be confirmed for the 24-hour projection.

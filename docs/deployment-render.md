@@ -1,31 +1,44 @@
-# Deployment plan — Render (paid plan prepared, NOT applied)
+# Deployment plan — Render
 
-Target: the founder's existing Render project **"Room by Room"**. `render.yaml` in the repository root is a
-Blueprint for the **paid** plan, ready for review. Applying it creates paid resources. Resource creation,
-deployment and live API spending need explicit founder approval. The paid hosting and the API budget are
-**not yet approved**.
+There are **three separate procedures**. Do not mix them.
 
-## Current state: founder-created free preview (October 2026)
+| Procedure | Status | Applies to | Document |
+|---|---|---|---|
+| **Free preview** | Live at https://room-by-room.onrender.com/ (Sprint 2B, accepted) | The founder-created **free** web service and **free PostgreSQL 18** database (Frankfurt). Owner `alistair`, manual deploys, no API key or worker. | `docs/deployment-render-free-preview.md` |
+| **Receipt-reading pilot** | Prepared; **needs founder approval** | Adds **one Starter worker** (Frankfurt) next to the existing free resources, plus a private API key on the worker and the web service. US$7 for at most a month and a US$5 API limit. | `docs/receipt-pilot.md` |
+| **Future in-place upgrade** | Proposed; **needs separate approval before 2 November 2026** | Changes the **existing** web service and **existing PostgreSQL 18** database to paid instance types in the dashboard, keeping the URL, data, owner, secret and the pilot worker. About US$20.30/month before tax, API use and overages. | This document, "In-place upgrade" below |
 
-The founder has created a **free web service** and a **free PostgreSQL database** in the "Room by Room"
-project. Their first deploy failed. Use these resources for a preview, following
-**`docs/deployment-render-free-preview.md`** (founder-applied checklist, owner creation without a Shell, free
-limits, manual backups). Do not apply the paid Blueprint or create replacements while the preview runs.
+**`render.yaml` is not any of these.** It is a Blueprint for a **separate, brand-new install**. It assumes:
+- a new PostgreSQL **16** database;
+- a Render-**generated** Django secret;
+- a **new** owner account;
+- new resource names.
 
-**Before any future Blueprint application, account for these existing resources first.** A Blueprint creates
-resources by name, so applying `render.yaml` unchanged could create a second web service and a second
-database next to the free ones. Decide between:
+**None of that may be applied to the existing deployment.** Applying it would create a second web service
+and a second database next to the existing ones. Use it only for a deliberate fresh install, after the
+official `render blueprints validate` run.
 
-- **Upgrade in place:** change the free service and database to paid instance types in the dashboard, and
-  align the Blueprint's names and settings with them before syncing; or
-- **Migrate:** apply the Blueprint, copy the data with the manual `pg_dump`/`pg_restore` procedure, verify it
-  with `restore_fingerprint`, then retire the free resources.
+## In-place upgrade (proposal; not approved)
 
-Also reconcile the PostgreSQL version: the Blueprint pins `"16"`, while the free database is probably 18.
-The application passes its full test suite on 16, 17 and 18. Never downgrade an existing database. Either
-choice needs a CTO decision and the official `render blueprints validate` run.
+Proposed only if the receipt pilot proves useful, and before the free database expires on **2 November 2026**
+(Render deletes it after a 14-day grace period).
 
-The rest of this document is the **paid plan**.
+1. In the dashboard:
+   - change the **web service** instance type from Free to **Starter** (US$7/month);
+   - change the **database** from Free to a paid plan, **0.1c-256mb** (US$6/month plus about US$0.30 for 1 GB
+     of storage), **keeping PostgreSQL 18**. Never downgrade.
+   Check the dashboard quote before confirming each change.
+2. Keep the pilot **worker** (Starter, US$7/month), or create it then if the pilot worker was suspended.
+3. Nothing else changes:
+   - the URL, data, owner, secret, settings and commands stay the same;
+   - the web start command may then move `migrate` into a pre-deploy command, which paid services support.
+4. Paid databases include Render's managed backups (point-in-time recovery). The manual-backup decision made
+   for the disposable preview then no longer applies.
+
+**Expected baseline:** about **US$20.30/month** before tax, API usage and overages. This needs **separate
+founder approval**.
+
+The rest of this document is the original paid-plan research and the `render.yaml` new-install Blueprint.
 
 ## Sources and how they were checked
 

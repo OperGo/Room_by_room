@@ -1,4 +1,7 @@
 # Render Blueprint for Room by Room — PREPARED FOR REVIEW, NOT APPLIED.
+# NEW-INSTALL ONLY: this describes a separate, brand-new install (new PostgreSQL 16 database, generated
+# secret, new owner). Do NOT apply it to the existing free preview, the receipt pilot or the in-place
+# upgrade; see docs/deployment-render.md ("three separate procedures").
 # Applying this creates paid resources (≈ US$20.30/month before tax, see docs/deployment-render.md);
 # do it only after explicit founder approval.
 #

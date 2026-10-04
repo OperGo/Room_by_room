@@ -59,6 +59,18 @@ def request_reading(owner, draft, expected_version):
         raise
 
 
+def _claimable_q(now):
+    # Queued (and due), or processing with an expired lease. Failed jobs are never claimed again:
+    # re-reading after a failure is always a new explicit owner action.
+    return (Q(status=ExtractionJob.Status.QUEUED) & (Q(available_at__isnull=True) | Q(available_at__lte=now))
+            | Q(status=ExtractionJob.Status.PROCESSING, lease_expires_at__lt=now))
+
+
+def claimable_jobs(now=None):
+    """Jobs a worker would claim (and send to the provider) right now, oldest first. Read-only."""
+    return ExtractionJob.objects.filter(_claimable_q(now or timezone.now())).order_by("created_at", "id")
+
+
 def claim_next_job(now=None):
     """Claim one job transactionally. Returns (job, token) or None. Recovers expired leases."""
     now = now or timezone.now()
@@ -66,10 +78,7 @@ def claim_next_job(now=None):
         with transaction.atomic():
             job = (
                 ExtractionJob.objects.select_for_update(skip_locked=True)
-                .filter(
-                    Q(status=ExtractionJob.Status.QUEUED) & (Q(available_at__isnull=True) | Q(available_at__lte=now))
-                    | Q(status=ExtractionJob.Status.PROCESSING, lease_expires_at__lt=now)
-                )
+                .filter(_claimable_q(now))
                 .order_by("created_at", "id")
                 .first()
             )

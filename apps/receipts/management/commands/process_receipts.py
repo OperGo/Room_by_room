@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import close_old_connections
 
 from apps.receipts.extraction import get_extractor
-from apps.receipts.jobs import process_available
+from apps.receipts.jobs import claimable_jobs, process_available
 
 
 class Command(BaseCommand):
@@ -18,6 +18,11 @@ class Command(BaseCommand):
         parser.add_argument("--interval", type=float, default=3.0, help="Seconds between polls in --watch mode.")
         parser.add_argument("--max-jobs", type=int, default=None, help="Stop after this many jobs (--once).")
 
+    def say(self, message):
+        # Flush every line: on Render stdout is a pipe, and buffered lines would appear late or never.
+        self.stdout.write(message)
+        self.stdout.flush()
+
     def handle(self, once, watch, interval, max_jobs, **options):
         extractor = get_extractor()
         if extractor is None:
@@ -25,9 +30,12 @@ class Command(BaseCommand):
                               "queued jobs will be marked failed with that reason.")
         elif extractor.is_test_double:
             self.stderr.write(self.style.WARNING("Using the FAKE test extractor: results are synthetic."))
+        # Say up front which jobs would be sent to the provider, so nothing is read unannounced.
+        pending = list(claimable_jobs().values_list("pk", flat=True)[:20])
+        self.say(f"Claimable at start: {len(pending)} job(s)" + (f" (ids {pending})" if pending else ""))
         if once:
             count = process_available(max_jobs=max_jobs)
-            self.stdout.write(f"Processed {count} job(s).")
+            self.say(f"Processed {count} job(s).")
             return
         if interval <= 0:
             raise CommandError("--interval must be positive.")
@@ -38,16 +46,16 @@ class Command(BaseCommand):
 
         signal.signal(signal.SIGTERM, _stop)
         signal.signal(signal.SIGINT, _stop)
-        self.stdout.write("Watching for receipt jobs. Press Ctrl+C to stop.")
+        self.say("Watching for receipt jobs. Press Ctrl+C to stop.")
         # One job per iteration, and the stop flag is checked before every claim: on SIGTERM the
         # job in hand finishes, nothing new is claimed and the worker never sleeps once stopping.
         while not stop["flag"]:
             close_old_connections()
             if process_available(max_jobs=1):
-                self.stdout.write("Processed 1 job(s).")
+                self.say("Processed 1 job(s).")
                 continue  # look for the next job straight away (after re-checking the flag)
             self._idle(interval, stop)
-        self.stdout.write("Stopped.")
+        self.say("Stopped.")
 
     @staticmethod
     def _idle(interval, stop):

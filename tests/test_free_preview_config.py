@@ -58,3 +58,22 @@ def test_missing_key_keeps_manual_route(settings):
     available, message, _ = extraction_status()
     assert get_extractor() is None and available is False
     assert message.startswith("Automatic extraction not configured")
+
+
+def test_pilot_checklist_matches_the_worker_and_settings():
+    pilot = (ROOT / "docs" / "receipt-pilot.md").read_text()
+    for text in ("| Build command | `pip install -r requirements.txt` |",
+                 "| Start command | `python manage.py process_receipts --watch --interval 3` |",
+                 "**Starter** (0.5c-512mb), **1 instance**", "| Auto-Deploy | **Off** |", "**90 seconds**",
+                 "| Region | **Frankfurt**", "| `RECEIPT_MODEL` | `claude-haiku-4-5-20251001` |",
+                 "| `PRIVATE_STORAGE_BACKEND` | `database` |", "| `ANTHROPIC_API_KEY` | **Leave out for now.**",
+                 "**Do not** copy the web secret", "python manage.py receipt_jobs", "Claimable at start: 0 job(s)",
+                 "auto-reload / automatic top-up is OFF", "spend limit to **US$5**"):
+        assert text in pilot, text
+    assert not re.search(r"sk-ant-|postgres(ql)?://[^\s:/]+:[^\s@]+@", pilot)  # no credentials
+    # The worker settings named in the guide exist; the attempt limit is fixed in code.
+    from django.conf import settings
+
+    assert settings.RECEIPT_MAX_ATTEMPTS == 2 and settings.RECEIPT_IMAGE_LONG_EDGE == 1568
+    blueprint = (ROOT / "render.yaml").read_text()
+    assert "NEW-INSTALL ONLY" in blueprint

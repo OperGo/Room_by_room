@@ -85,7 +85,8 @@ variable directly on the service.
 | `RECEIPT_EXTRACTOR` | `anthropic` |
 | `RECEIPT_MODEL` | `claude-haiku-4-5-20251001` |
 
-- **Leave `ANTHROPIC_API_KEY` unset.** Automatic reading then shows "Automatic extraction not configured.
+- **Leave `ANTHROPIC_API_KEY` unset** until the receipt-reading pilot is approved (`docs/receipt-pilot.md`
+  says how and where to add it privately). Automatic reading then shows "Automatic extraction not configured.
   Enter the details from the receipt." Manual review and confirmation work normally.
 - There is no receipt worker in this preview. Do not add one: no worker inside Gunicorn, no background
   threads, no fake extractor.

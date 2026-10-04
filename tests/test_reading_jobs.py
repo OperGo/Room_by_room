@@ -501,3 +501,70 @@ def test_every_returned_editor_starts_dirty_and_get_stays_clean(client_owner, ow
     assert "pounds sterling" in gbp.content.decode()
     assert Purchase.objects.filter(source_draft=draft).count() == 0  # nothing confirmed by any redisplay
     assert Purchase.objects.count() == 1  # only the deliberately seeded earlier purchase
+
+
+# ------------------------------------------------------------------ Sprint 2C pilot: what a worker would send
+
+
+def _receipt_jobs_output():
+    import io
+
+    out = io.StringIO()
+    call_command("receipt_jobs", stdout=out)
+    return out.getvalue()
+
+
+def test_receipt_jobs_lists_only_what_a_worker_would_claim(client_owner, owner, draft):
+    from apps.receipts.jobs import claimable_jobs
+
+    assert "Claimable now (a running worker would send these to the provider): 0" in _receipt_jobs_output()
+    queued = jobs.request_reading(owner, draft, draft.version)
+    assert list(claimable_jobs()) == [queued]
+    # A permanently failed job is never claimed again, so starting a worker cannot silently retry it.
+    FakeExtractor.queue.append(ExtractionError("refusal", "declined"))
+    jobs.process_available()
+    queued.refresh_from_db()
+    assert queued.status == "failed" and list(claimable_jobs()) == []
+    output = _receipt_jobs_output()
+    assert "Claimable now (a running worker would send these to the provider): 0" in output
+    assert f"  {queued.pk} | {str(draft.uuid)[:8]} | failed |" in output
+
+
+def test_receipt_jobs_reports_usage_and_cost_without_receipt_content(client_owner, owner, draft):
+    from apps.receipts.extraction import ReceiptExtractionResult
+
+    FakeExtractor.queue.append(lambda doc: ReceiptExtractionResult(
+        raw=copy.deepcopy(SAMPLE_RESULT), model_version="claude-haiku-4-5-20251001",
+        usage={"input_tokens": 2000, "output_tokens": 600}))
+    jobs.request_reading(owner, draft, draft.version)
+    jobs.process_available()
+    output = _receipt_jobs_output()
+    assert "claude-haiku-4-5-20251001 | 2000/600 |" in output
+    assert "estimated list-price cost US$0.0050" in output  # 2000 x $1/M + 600 x $5/M
+    draft.refresh_from_db()
+    assert draft.data["merchant"] not in output  # no merchant, amounts or file names in the listing
+    assert draft.document.original_filename not in output and "31.17" not in output
+
+
+def test_worker_announces_claimable_jobs_at_start(client_owner, owner, draft):
+    import io
+
+    job = jobs.request_reading(owner, draft, draft.version)
+    out = io.StringIO()
+    call_command("process_receipts", "--once", stdout=out)
+    assert f"Claimable at start: 1 job(s) (ids [{job.pk}])" in out.getvalue()
+
+
+def test_worker_log_lines_are_flushed_immediately(owner, draft):
+    import io
+
+    class Pipe(io.StringIO):
+        flushes = 0
+
+        def flush(self):
+            Pipe.flushes += 1
+            super().flush()
+
+    out = Pipe()
+    call_command("process_receipts", "--once", stdout=out)
+    assert "Claimable at start: 0 job(s)" in out.getvalue() and Pipe.flushes >= 2  # announced + processed lines

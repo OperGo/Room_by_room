@@ -82,4 +82,4 @@ Details: `docs/assessments/2026-10-05-product-assessment.md`.
 | PR | Head SHA | CI | Merged | Deployed | Production verified |
 |---|---|---|---|---|---|
 | #1 Operating framework + lean CI | `6934f50` | green (run 3: SQLite, PostgreSQL 18) | **yes, `2765733`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `2765733`** (CTO-verified) | cron: later runs succeeded (CTO-verified); **web health pending** (Render log query timed out) |
-| #2 Milestone 3 plan + ledger update | `935e4d9` | green (SQLite, PostgreSQL 18) | **yes, `6ceefd6`** (merge commit, CTO-authorised, head-SHA guarded) | auto-deploy (docs only) | pending CTO verification |
+| #2 Milestone 3 plan + ledger update | `935e4d9` | green (SQLite, PostgreSQL 18) | **yes, `6ceefd6`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron at `6ceefd6`** (CTO-verified) | verified by the CTO |

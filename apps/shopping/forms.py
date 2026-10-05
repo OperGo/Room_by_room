@@ -11,10 +11,10 @@ class ShoppingItemForm(forms.ModelForm):
     class Meta:
         model = ShoppingItem
         fields = ["description", "quantity", "unit", "project", "task", "retailer", "notes"]
-        labels = {"project": "Project (leave empty for shared)", "task": "Task (optional)", "retailer": "Preferred retailer (optional)"}
+        labels = {"project": "Project", "task": "Task", "retailer": "Preferred retailer"}
         widgets = {
             "quantity": forms.NumberInput(attrs={"step": "any", "min": "0.01", "inputmode": "decimal"}),
-            "unit": forms.TextInput(attrs={"placeholder": "e.g. sheets, tins, m"}),
+            "unit": forms.TextInput(attrs={"placeholder": "e.g. tins"}),
         }
 
     def __init__(self, owner, *args, **kwargs):
@@ -22,6 +22,7 @@ class ShoppingItemForm(forms.ModelForm):
         self.owner = owner
         self.fields["project"].queryset = Project.objects.for_owner(owner).exclude(status=Project.Status.ARCHIVED).order_by("title")
         self.fields["project"].empty_label = "Shared / no project"
+        self.fields["task"].empty_label = "Not linked to a task"
         self.fields["task"].queryset = Task.objects.for_owner(owner).filter(
             status__in=[Task.Status.TODO, Task.Status.IN_PROGRESS]
         ).select_related("project").order_by("project__title", "position")

@@ -11,7 +11,7 @@ class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
         fields = ["title", "room", "status", "budget", "start_date", "completion_date", "notes"]
-        labels = {"budget": "Budget (£)", "completion_date": "Completion date", "room": "Room (optional)"}
+        labels = {"budget": "Budget (£)", "completion_date": "Completion date", "room": "Room"}
         widgets = {
             "start_date": DATE,
             "completion_date": DATE,
@@ -40,7 +40,7 @@ class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
         fields = ["title", "estimated_minutes", "due_date", "notes"]
-        labels = {"estimated_minutes": "Estimated minutes (optional)", "due_date": "Due date (optional)"}
+        labels = {"estimated_minutes": "Estimated minutes", "due_date": "Due date"}
         widgets = {
             "due_date": DATE,
             "notes": forms.Textarea(attrs={"rows": 3}),

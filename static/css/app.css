@@ -246,8 +246,13 @@ input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--er
 input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; accent-color: var(--primary); margin: 0; flex: none; }
 .check { display: flex; gap: 12px; align-items: flex-start; min-height: var(--tap); padding: 10px 0; }
 .check label { font-weight: 500; }
-.field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-.field-row > *, input[type="date"] { min-width: 0; }  /* date inputs must shrink on narrow, high-density phones */
+.field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: end; }  /* inputs line up when one label wraps */
+.field-row > *, input[type="date"] { min-width: 0; }
+/* Purchase header: Merchant, Date and Total stack on phones; Merchant + Date share a row from 600px
+   (Total below); all three share one row from 1024px, where every label fits on one line. */
+.editor-head-row { display: grid; gap: 0 12px; grid-template-columns: minmax(0, 1fr); align-items: end; }
+@media (min-width: 600px) { .editor-head-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (min-width: 1024px) { .editor-head-row { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); } }  /* date inputs must shrink on narrow, high-density phones */
 .checkbox-list { list-style: none; padding: 0; margin: 0; }
 .checkbox-list li { border-top: 1px solid var(--line); }
 .checkbox-list label { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 0; font-weight: 500; }
@@ -268,7 +273,7 @@ input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; accent-
 .messages { margin-bottom: 12px; }
 
 .empty { text-align: center; padding: 28px 16px; color: var(--muted); }
-.empty .icon { color: var(--primary); margin: 0 auto 8px; }
+.empty > .icon { color: var(--primary); margin: 0 auto 8px; }  /* the empty-state illustration only, not button icons */
 
 /* ------------------------------------------------------------------ purchase editor */
 
@@ -372,7 +377,8 @@ details.disclosure > summary::-webkit-details-marker { display: none; }
 
 @media (min-width: 1024px) {
   .bottom-nav { display: none; }
-  .app { display: grid; grid-template-columns: 232px minmax(0, 1fr); }
+  /* Only signed-in pages have the sidebar; signed-out pages (sign-in) keep a single centred column. */
+  .app.has-nav { display: grid; grid-template-columns: 232px minmax(0, 1fr); }
   .side-nav {
     display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; height: 100vh;
     padding: 22px 14px; border-right: 1px solid var(--line); background: var(--bg);

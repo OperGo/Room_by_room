@@ -471,3 +471,62 @@ def test_tablet_shows_home_sign_out(browser, live_server, owner):
     assert _visible_and_unobstructed(page, button)
     assert no_horizontal_scroll(page)
     context.close()
+
+
+# ------------------------------------------------------------------ assessment gaps 3 and 4: sign-in and form finish
+
+
+@pytest.mark.parametrize("width", [1024, 1440])
+def test_desktop_sign_in_card_is_centred_and_signed_in_sidebar_kept(browser, live_server, owner, width):
+    context = browser.new_context(viewport={"width": width, "height": 900})
+    page = context.new_page()
+    for attempt in ("first view", "after a failed sign-in"):
+        if attempt != "first view":
+            page.fill("#id_username", "owner")
+            page.fill("#id_password", "wrong-password")
+            page.click("button[type=submit]")
+            expect(page.locator(".alert-error")).to_be_visible()
+        else:
+            page.goto(f"{live_server.url}/account/sign-in/")
+        box = page.locator(".login-card").bounding_box()
+        assert 360 <= box["width"] <= 380, (attempt, box)
+        assert abs((box["x"] + box["width"] / 2) - width / 2) <= 2, (attempt, box)
+        assert no_horizontal_scroll(page)
+    sign_in(page, live_server)
+    nav = page.locator(".side-nav").bounding_box()
+    main = page.locator("main").bounding_box()
+    assert nav["x"] == 0 and 230 <= nav["width"] <= 234 and main["x"] >= nav["width"]
+    context.close()
+
+
+VIEWPORTS = {"390": dict(viewport=PHONE, has_touch=True, is_mobile=True, device_scale_factor=3),
+             "768": dict(viewport={"width": 768, "height": 1024}, has_touch=True, is_mobile=True),
+             "1440": dict(viewport=DESKTOP)}
+
+
+@pytest.mark.parametrize("label", list(VIEWPORTS))
+def test_form_finish_on_affected_screens(browser, live_server, owner, label):
+    context = browser.new_context(**VIEWPORTS[label])
+    page = context.new_page()
+    sign_in(page, live_server)
+    # Empty Home: the New project button's icon is drawn in the button's text colour, not the background colour.
+    icon = page.locator(".empty a.btn svg.icon")
+    colours = icon.evaluate("el => [getComputedStyle(el).color, getComputedStyle(el.closest('.btn')).backgroundColor]")
+    assert colours[0] != colours[1], colours
+    assert no_horizontal_scroll(page)
+    office = Project.objects.create(owner=owner, title="Office")
+    for path in ("/projects/new/", "/shopping/new/", f"/projects/{office.uuid}/tasks/new/", "/costs/purchases/new/"):
+        page.goto(f"{live_server.url}{path}")
+        assert no_horizontal_scroll(page), (label, path)
+        labels = page.locator("label").all_inner_texts()
+        assert not [t for t in labels if t.count("(optional)") > 1], (label, path, labels)
+    # Add purchase header: stacked on phones, one aligned row from 600px; placeholder text not clipped.
+    merchant = page.locator("#f-merchant").bounding_box()
+    date = page.locator("#f-date").bounding_box()
+    if label == "390":
+        assert date["y"] >= merchant["y"] + merchant["height"], (merchant, date)
+        assert page.locator("#f-merchant").evaluate("el => el.scrollWidth <= el.clientWidth")
+    else:
+        # Same row: the inputs' bottom edges line up (a date input is a couple of pixels taller).
+        assert abs((date["y"] + date["height"]) - (merchant["y"] + merchant["height"])) <= 1, (merchant, date)
+    context.close()

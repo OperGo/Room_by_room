@@ -1,0 +1,63 @@
+# Lean CI for the release branch. Fictional data only: no production credentials, no live API calls
+# (tests force ANTHROPIC_API_KEY empty and use fakes or a local stub).
+name: CI
+
+on:
+  pull_request:
+    branches: [sprint-2a]
+  push:
+    branches: [sprint-2a]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sqlite:
+    name: Tests (SQLite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: No missing migrations
+        run: python manage.py makemigrations --check --dry-run
+        env:
+          DJANGO_ALLOW_INSECURE_KEY: "1"
+      - run: pytest -rs
+
+  postgres:
+    name: Tests (PostgreSQL 18)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci-disposable-only
+          POSTGRES_DB: roombyroom_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci -d roombyroom_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Disposable service container that exists only for this job; not a real credential.
+      DATABASE_URL: postgres://ci:ci-disposable-only@localhost:5432/roombyroom_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Server is PostgreSQL 18
+        run: python -c "import os, psycopg; c = psycopg.connect(os.environ['DATABASE_URL']); v = c.info.server_version; print(v); assert v // 10000 == 18"
+      - run: pytest -rs

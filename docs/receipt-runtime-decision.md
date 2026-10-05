@@ -11,11 +11,23 @@ the CTO) and applied the setup below. Live receipt testing (R1–R5) is in progr
 |---|---|
 | Web service | **Free** (unchanged URL, owner and secret). `ANTHROPIC_API_KEY` set privately; deployed commit `9372c48`; `/healthz/` ok; "Read receipt automatically" shown. |
 | Database | Existing PostgreSQL 18 **upgraded in place to paid** `0.1c-256mb`, 1 GB (about US$6.30/month). Data, URL and owner kept; no expiry; Render managed backups. External access stays closed. |
-| Receipt reading | Cron Job `room-by-room-receipts`: Starter (US$0.00016/min), Frankfurt, `* * * * *`, `python manage.py process_receipts --once`, Auto-Deploy Off, deployed at `c85e964`, `ANTHROPIC_API_KEY` set via save-and-deploy. **Active.** First runs: without the key, "not configured" and `Claimable at start: 0 job(s)`; with the key, Claimable 0, Processed 0. |
+| Receipt reading | Cron Job `room-by-room-receipts`: Starter (US$0.00016/min), Frankfurt, `* * * * *`, `python manage.py process_receipts --once`, Auto-Deploy **On** (CTO decision, 5 October), deployed at `c85e964`, `ANTHROPIC_API_KEY` set via save-and-deploy. **Active.** First runs: without the key, "not configured" and `Claimable at start: 0 job(s)`; with the key, Claimable 0, Processed 0. |
 | Anthropic | `Room by Room` workspace; **US$5 monthly spend limit**; **auto-reload off**; **US$5 credit purchased** (the minimum purchase). The key is kept only in the founder's password manager. |
 
 `9372c48` and `c85e964` differ only in documentation, so the two services run the same application code. Later
 documentation-only commits need no redeploy.
+
+**Discrepancies observed by the CTO on Render (5 October 2026):**
+
+| Observed | This guide's intended state | Note |
+|---|---|---|
+| Web service and cron job both deployed at **`380c190`** | `9372c48` (web), `c85e964` (cron) | `380c190` has the same application code (later commits are documentation only). Consistent with auto-deploy picking up each documentation push. |
+| **Auto-Deploy enabled** on both services | Originally Off | **Resolved: the CTO decided to keep it On** for both. Reviewed merges into `sprint-2a` deploy both services; the CTO verifies them afterwards. No direct pushes to `sprint-2a`. |
+| A remaining **"mac temp"** database access rule | External access closed (no rules) | **Resolved:** the founder removed it, and the CTO independently verified that external access is closed (5 October). |
+
+Operating framework (5 October 2026): the CTO has Render access (Sunday.Je workspace → Room by Room) and runs
+deployments, verification and the Render-side procedures below. The founder supplies samples, checks values and
+taps Read where a signed-in owner is needed.
 
 ## Recommendation
 
@@ -146,7 +158,7 @@ on **both** the cron job and the web service.
    - Branch `sprint-2a` at the final tested SHA.
    - Schedule `* * * * *`.
    - Build command `pip install -r requirements.txt`. Command `python manage.py process_receipts --once`.
-   - Instance type **Starter**. Auto-Deploy **Off**.
+   - Instance type **Starter**. Auto-Deploy **Off**. (Superseded 5 October: the CTO keeps Auto-Deploy **On**.)
    - Environment, set on the cron job itself:
 
      | Key | Value |
@@ -212,21 +224,60 @@ For each receipt, record:
    flagged draft, so it does not guarantee a failure. Use a real terminal failure if one happens; otherwise run
    the **intentional authentication-failure check** below.
 
-### Intentional authentication-failure check (CTO-approved)
+### Intentional authentication-failure check (CTO-approved; process-scoped key override)
 
 This is extra to the five samples and never counts towards accuracy. Report it as an intentional
-authentication failure, not a provider outage.
+authentication failure, not a provider outage. **Stored keys are never edited** on either service: the invalid
+key is set only in the environment of the processes started by the cron command, with `env`. Proven locally:
+`tests/test_auth_failure_override.py` and `docs/sprints/evidence/milestone-2-auth-failure-rehearsal.txt`.
 
-1. Pause uploads. On the cron job's Runs/Events page, **wait for an empty queue and no active run**.
-2. Cron job → **Environment**: replace **only the cron job's** `ANTHROPIC_API_KEY` with `invalid-pilot-test-key`,
-   then **"Save, rebuild, and deploy"**. **Keep the web service's valid key unchanged.**
-3. Signed in, create a **fresh disposable draft** from an already-used, valid receipt image (for example the R1
-   photo) and tap Read. Expect an authentication failure **without an automatic retry** (1 attempt).
-4. Check that **manual entry is still available** and **Costs is unchanged**. Leave the draft **unconfirmed**.
-5. Restore the real key on the cron job **privately** from the password manager, then "Save, rebuild, and
-   deploy".
-6. Verify restoration with **another fresh, unconfirmed** reading of a valid image (or the next real sample).
-   Diagnostic re-reads are not independent accuracy samples.
+**The override stays in force for every scheduled run until the command is restored.** The prefix is part of
+the *saved* cron command, so each run (every minute) uses the invalid key. Any job queued during the window
+fails permanently with `auth`, which is why the queue must be empty first and uploads stay paused until
+restoration is verified.
+
+**Roles.** The CTO edits the cron command and reads the logs on Render. The founder, as the signed-in owner,
+taps Read and supplies the owner evidence: the failure message, that manual entry is still available, that
+Costs is unchanged, and the successful reading after restoration. Owner evidence is founder-reported.
+
+**Normal command (exact):** `python manage.py process_receipts --once`
+
+1. **Agree a time and pause uploads.** The founder does not upload or tap Read until step 4.
+2. **Mandatory empty-queue proof (CTO).** Swap the command to `python manage.py receipt_jobs --limit 200` (see
+   "Collecting the receipt_jobs evidence"), wait for a scheduled run, and read its log. The queue is empty
+   **only if both** hold:
+   - the "Recent jobs" table lists **fewer rows than the limit**, so it is the **complete** job table (it is
+     every job, newest first, unfiltered); if it lists exactly the limit, rerun with a larger limit; and
+   - **no row has status `queued` or `processing`**. `queued` includes delayed retries (waiting for their retry
+     time) and `processing` includes jobs under an active or expired lease. "Claimable now: 0" alone is not
+     enough: it excludes delayed retries and actively leased jobs.
+   If the table cannot be shown complete, or any row is `queued`/`processing`, **stop**: restore the normal
+   command (step 6) and report. Do not wait it out by pressing Trigger Run.
+3. **Set the override (CTO).** Cron job → Settings → Command:
+   `env ANTHROPIC_API_KEY=invalid-pilot-test-key python manage.py process_receipts --once`. Save (and deploy,
+   if Render asks); note the deployed commit and the time saved. Wait for one run started after the save: its
+   log must show `Claimable at start: 0 job(s)`.
+4. **Founder:** upload the R1 photo again as a **fresh disposable draft** and tap **Read receipt
+   automatically** once. Leave it unconfirmed.
+5. **Observe the failure.**
+   - CTO, from the logs: one run shows `Claimable at start: 1 job(s)` and `Processed 1 job(s)`, and the next
+     shows `Claimable at start: 0 job(s)`, so there was no automatic retry.
+   - Founder: the draft says "Couldn't read this receipt", manual entry is still available, and Costs is
+     unchanged.
+6. **Restore, always (CTO).** Set the command back to **exactly** `python manage.py process_receipts --once` and
+   save (and deploy). Do this on completion, **and also on any failure, interruption or doubt**, including if
+   step 2 stops, step 4 is not done, or the session ends early.
+7. **Verify a normal run before ordinary readings resume (CTO).**
+   - Settings shows the exact normal command, with no `env` prefix.
+   - A run that started after the save logs `Claimable at start: …` and `Processed …`.
+   - The founder then takes a fresh, unconfirmed reading of the R1 photo, and its values appear. That proves
+     the stored key is in use; this re-read is diagnostic, not an accuracy sample.
+   Only then do uploads and ordinary readings resume. Record the restored command, the time and the deployed
+   commit.
+8. Collect `receipt_jobs` once more if needed: the failure job should show `failed | none | 1/2 | … | auth`
+   with 0/0 tokens. Then restore the normal command again and repeat the step-7 run check.
+
+An invalid key is rejected by the provider before any processing, so it is not billed.
 
 ### What counts as a sample
 
@@ -245,7 +296,7 @@ The ordinary run logs don't include token figures. Use the existing read-only `r
 
 **If the cron job offers a Shell:** open it and run `python manage.py receipt_jobs --limit 20`.
 
-**If there is no Shell,** temporarily swap the cron command:
+**If there is no Shell,** temporarily swap the cron command (CTO, on Render):
 1. **Pause uploads.** Don't upload or tap Read during this procedure.
 2. On the cron job's **Runs/Events** page, **wait until no run is active**, and the last run shows finished.
    Don't press Trigger Run during an active run: Render cancels it.

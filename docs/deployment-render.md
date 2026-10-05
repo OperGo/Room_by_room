@@ -9,6 +9,23 @@ There are **three separate procedures**. Do not mix them.
 | **Receipt-reading pilot** | **Paused by founder** (4 October 2026). Checklist kept as an unapplied option; no spending approved | Adds **one Starter worker** (Frankfurt) next to the existing free resources, plus a private API key on the worker and the web service. US$7 for at most a month and a US$5 API limit. | `docs/receipt-pilot.md` |
 | **Future in-place upgrade** | **Superseded in part.** The database upgrade was applied under the Milestone 1 plan (no expiry now). A paid web service or worker still needs separate approval | Changes the **existing** web service and **existing PostgreSQL 18** database to paid instance types in the dashboard, keeping the URL, data, owner, secret and the pilot worker. About US$20.30/month before tax, API use and overages. | This document, "In-place upgrade" below |
 
+## Release procedure (operating framework, 5 October 2026)
+
+The CTO owns technical delivery and has Render access (Sunday.Je workspace → Room by Room project). See
+`AGENTS.md` → "Release loop" and the current state in `docs/delivery-ledger.md`.
+1. Claude opens one bounded PR into **`sprint-2a`** with its head SHA, test results and migration notes. CI
+   (SQLite and PostgreSQL 18) must be green.
+2. The CTO reviews the actual changes and merges only the reviewed head.
+3. The merge auto-deploys the web service and the cron job; **verify the deployed commit** on each. Migrations run on web start (`migrate --noinput`).
+4. Production checks: `/healthz/` ok; the cron job's next run logs `Claimable at start: …`; for receipt
+   changes, one owner reading. Documentation/CI-only merges need no redeploy.
+5. Founder approval is needed only for the reserved categories in `AGENTS.md` (spending, material product
+   changes, launch/communications, personal-information handling, destructive or data-risk actions).
+
+**Auto-Deploy is On** for the web service and the cron job (CTO decision, 5 October 2026). A reviewed merge
+into `sprint-2a` therefore deploys both services; the CTO verifies the deployed commit on each afterwards.
+**No direct pushes to `sprint-2a`**: every change reaches it through a reviewed PR.
+
 **`render.yaml` is not any of these.** It is a Blueprint for a **separate, brand-new install**. It assumes:
 - a new PostgreSQL **16** database;
 - a Render-**generated** Django secret;

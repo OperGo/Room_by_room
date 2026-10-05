@@ -17,6 +17,18 @@ the CTO) and applied the setup below. Live receipt testing (R1–R5) is in progr
 `9372c48` and `c85e964` differ only in documentation, so the two services run the same application code. Later
 documentation-only commits need no redeploy.
 
+**Discrepancies observed by the CTO on Render (5 October 2026), not yet reconciled:**
+
+| Observed | This guide's intended state | Note |
+|---|---|---|
+| Web service and cron job both deployed at **`380c190`** | `9372c48` (web), `c85e964` (cron) | `380c190` has the same application code (later commits are documentation only). Consistent with auto-deploy picking up each documentation push. |
+| **Auto-Deploy enabled** on both services | **Off** on both | With it on, every push or merge to `sprint-2a` deploys both services immediately. Needs a CTO decision. |
+| A remaining **"mac temp"** database access rule | External access closed (no rules) | Left from the founder's laptop helper sessions. Needs a CTO decision. |
+
+Operating framework (5 October 2026): the CTO has Render access (Sunday.Je workspace → Room by Room) and runs
+deployments, verification and the Render-side procedures below. The founder supplies samples, checks values and
+taps Read where a signed-in owner is needed.
+
 ## Recommendation
 
 | Part | Setup | Monthly cost (USD, before tax) |
@@ -212,21 +224,33 @@ For each receipt, record:
    flagged draft, so it does not guarantee a failure. Use a real terminal failure if one happens; otherwise run
    the **intentional authentication-failure check** below.
 
-### Intentional authentication-failure check (CTO-approved)
+### Intentional authentication-failure check (CTO-approved; process-scoped key override)
 
 This is extra to the five samples and never counts towards accuracy. Report it as an intentional
-authentication failure, not a provider outage.
+authentication failure, not a provider outage. **The stored keys are never edited:** the invalid key is set for
+the cron command's own process only, with `env`. Proven locally: `tests/test_auth_failure_override.py` and
+`docs/sprints/evidence/milestone-2-auth-failure-rehearsal.txt`.
 
-1. Pause uploads. On the cron job's Runs/Events page, **wait for an empty queue and no active run**.
-2. Cron job → **Environment**: replace **only the cron job's** `ANTHROPIC_API_KEY` with `invalid-pilot-test-key`,
-   then **"Save, rebuild, and deploy"**. **Keep the web service's valid key unchanged.**
-3. Signed in, create a **fresh disposable draft** from an already-used, valid receipt image (for example the R1
-   photo) and tap Read. Expect an authentication failure **without an automatic retry** (1 attempt).
-4. Check that **manual entry is still available** and **Costs is unchanged**. Leave the draft **unconfirmed**.
-5. Restore the real key on the cron job **privately** from the password manager, then "Save, rebuild, and
-   deploy".
-6. Verify restoration with **another fresh, unconfirmed** reading of a valid image (or the next real sample).
-   Diagnostic re-reads are not independent accuracy samples.
+Run by the CTO on Render, with one founder action (step 3):
+1. Agree a time with the founder; pause uploads. On the cron job's Events/Runs page, **wait for no active run**
+   (don't press Trigger Run during a run; Render cancels it). Optionally confirm an empty queue with the
+   `receipt_jobs` swap below.
+2. Cron job → **Settings → Command**: set it to
+   `env ANTHROPIC_API_KEY=invalid-pilot-test-key python manage.py process_receipts --once`, then save (and deploy,
+   if Render asks). Note the
+   deployed commit. **Environment variables are not touched**, on either service.
+3. **Founder:** signed in, upload the R1 photo again as a **fresh disposable draft** and tap **Read receipt
+   automatically**. Leave it **unconfirmed**.
+4. Within a run or two the log shows `Claimable at start: 1 job(s)` and `Processed 1 job(s)`; the following run
+   shows `Claimable at start: 0 job(s)` (**no automatic retry**). The founder (or `receipt_jobs`) confirms the
+   page says "Couldn't read this receipt", **manual entry is still available**, and **Costs is unchanged**.
+5. **Restore** the command to exactly `python manage.py process_receipts --once` and save (and deploy). The
+   next run's log shows `Claimable at start: 0 job(s)`.
+6. Verify restoration with **another fresh, unconfirmed** reading of the R1 photo (founder taps Read; values
+   appear). Diagnostic re-reads are not independent accuracy samples.
+7. Collect `receipt_jobs` (below): expect the failure job as `failed | 1/2 | … | auth` with 0/0 tokens.
+
+An invalid key is rejected by the provider before any processing, so it is not billed.
 
 ### What counts as a sample
 
@@ -245,7 +269,7 @@ The ordinary run logs don't include token figures. Use the existing read-only `r
 
 **If the cron job offers a Shell:** open it and run `python manage.py receipt_jobs --limit 20`.
 
-**If there is no Shell,** temporarily swap the cron command:
+**If there is no Shell,** temporarily swap the cron command (CTO, on Render):
 1. **Pause uploads.** Don't upload or tap Read during this procedure.
 2. On the cron job's **Runs/Events** page, **wait until no run is active**, and the last run shows finished.
    Don't press Trigger Run during an active run: Render cancels it.

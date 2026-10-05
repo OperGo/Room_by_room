@@ -2,29 +2,51 @@
 
 Room by Room is a phone-first renovation organiser (Django). Read this before changing anything.
 
-## Roles
-- **CTO / product lead:** ChatGPT. Owns scope, architecture and acceptance criteria.
-- **Implementation engineer:** Claude (coding sessions). Owns code, tests and evidence.
-- **Founder / first user:** Alistair Mundy Dunne. Relays reports to the CTO and returns decisions.
-  The founder's later explicit instructions take precedence over this file.
-- Coding sessions cannot talk to the CTO directly and must not assume the CTO has seen the repository.
+## Roles (operating framework, 5 October 2026)
+- **CTO / technical delivery owner:** ChatGPT. Owns scope, architecture, acceptance criteria, technical
+  decisions, PR review, merge authorisation, deployment and production verification. Has Render access
+  (Sunday.Je workspace → Room by Room project).
+- **Implementation engineer:** Claude (coding sessions). Owns code, tests, evidence and PRs.
+- **Founder / first user:** Alistair Mundy Dunne. Provides business direction, genuine samples, checks of
+  extracted values and product feedback. The founder is **not** the default coordinator, reviewer or
+  release operator. The founder's later explicit instructions take precedence over this file.
+- Coding sessions cannot talk to the CTO directly; handoffs are relayed. Do not assume the CTO has seen
+  the repository.
 
-## Sprint process (mandatory)
-1. Work only within the current sprint's approved scope. Resolve routine details (CSS, naming) yourself.
-2. At the end of **every** sprint, including corrective ones, write the CTO report using the template
-   in the brief (section 13), in **one copyable text block**, and save the same text as
-   `docs/sprints/sprint-NN-report.md`.
-3. Stop after delivering the report. Do not start the next sprint until the founder relays CTO review.
-4. If blocked, report completed work and the exact missing input. Never present a blocker as done.
-5. Always distinguish **mocked**, **automatically tested**, **visually inspected** and
-   **live-provider-tested** behaviour. Never claim tests passed without running them.
-6. Major scope or architecture departures need a CTO decision, listed in the report.
-7. Commit meaningful checkpoints. **Routine Git pushes** to the working branch on
-   OperGo/Room_by_room are authorised at the CTO's discretion (founder authorisation, relayed by the
-   CTO on 3 October 2026); no separate permission is needed before each push. Use normal pushes only
-   (no force-push or history rewriting) and verify the remote SHA matches local HEAD.
-   Opening PRs, merging, deploying, changing repository settings/visibility and provisioning paid
-   services still require an explicit founder instruction.
+## Decisions and question routing
+- Within approved scope, make routine implementation and testing decisions yourself.
+- Address architecture, scope interpretation, review and release questions to the **CTO** in the handoff.
+  Continue independent work while a CTO decision is pending.
+- Do **not** ask the founder to approve routine fixes, documentation, tests, PR creation, reviewed merges or
+  deployments, and do not repeatedly ask whether to continue an already authorised milestone.
+- **Founder approval is reserved for:** material product/UX changes; new or increased spending; public
+  launch or external communications; significant changes to personal-information handling; destructive
+  actions or meaningful risk to existing data. Route these **through the CTO with a recommendation**.
+- If access is blocked, name the exact limitation and the smallest necessary founder action. Never request
+  credentials in chat, and never give the cloud coding environment external database access.
+
+## Release loop
+1. Release branch: **`sprint-2a`**. The repository default is still `sprint-1`: never target it by
+   accident, and do not change repository settings, visibility or the default branch.
+2. Open **one bounded PR into `sprint-2a`** from a short-lived branch. Hand off its URL, **exact head SHA**,
+   actual test results and migration implications.
+3. The CTO reviews the actual changes. Merge only the **reviewed head**, under CTO authorisation; if the
+   head changes after review, return it for re-review.
+4. CI (`.github/workflows/ci.yml`) runs SQLite and disposable PostgreSQL 18 suites on standard runners with
+   fictional data, no production credentials and no live API calls. Keep it green.
+5. After merging, deploy and **verify the deployed commit** on every affected service. Merged does not mean
+   deployed. Documentation/CI-only changes need no application redeploy.
+6. Normal pushes only (no force-push or history rewriting); verify the remote SHA matches local HEAD.
+
+## Reporting
+- Keep **one current delivery ledger**, `docs/delivery-ledger.md`: milestones, acceptance evidence,
+  blockers and next actions. Update it with the work, not in separate administrative rounds.
+- Reports contain completed work, outstanding CTO decisions and essential founder actions only, plus:
+  PR URL and head SHA, tests actually run, migrations, merge SHA, deployed SHA and production verification.
+- Report evidence separately: **local**, **CI**, **independently observed production** and
+  **founder-reported**; distinguish mocked from live-provider-tested behaviour. Never claim tests passed
+  without running them. Never present a blocker as done; report material blockers promptly.
+- Milestone reports go in `docs/sprints/` as one copyable CTO-only block.
 
 ## Non-negotiables
 - Money: `Decimal`, GBP only for posted records, two decimals, inclusive prices, no tax maths, no FX.
@@ -37,4 +59,5 @@ Room by Room is a phone-first renovation organiser (Django). Read this before ch
 
 ## Commands
 See README.md. Run `pytest` (SQLite) and `DATABASE_URL=postgres://... pytest` (PostgreSQL, includes
-concurrency tests) and `pytest tests/browser -o addopts=""` (Playwright) before reporting.
+concurrency tests) before opening a PR; CI repeats both. Run `pytest tests/browser -o addopts=""`
+(Playwright) for any change to templates, CSS or JavaScript.

@@ -1,0 +1,30 @@
+Milestone 2 — controlled authentication-failure rehearsal (local, 5 October 2026)
+
+What: the exact production command prefix, run as separate processes against a fresh local PostgreSQL 18.6
+database with fictional data. The real Anthropic SDK (anthropic==1.11.0) was pointed at a local stub
+(ANTHROPIC_BASE_URL=http://127.0.0.1:8765) that answers 401 authentication_error, so no provider was called.
+Stored key in the process environment: ANTHROPIC_API_KEY=stored-valid-looking-key (fictional).
+The draft was uploaded and Read was tapped through the app's own views as a signed-in fictional owner.
+
+owner taps Read -> HTTP 302 | queued jobs: 1
+--- 1. Failure window: $ env ANTHROPIC_API_KEY=invalid-pilot-test-key python manage.py process_receipts --once
+Claimable at start: 1 job(s) (ids [1])
+[stub] POST /v1/messages x-api-key=invalid-pilot-test-key -> 401
+Processed 1 job(s).
+--- 2. Next run in the window (no automatic retry expected)
+Claimable at start: 0 job(s)
+Processed 0 job(s).
+--- 3. Restored command (no prefix) after the owner taps Try reading again: the stored key is used
+owner taps Try reading again -> HTTP 302
+Claimable at start: 1 job(s) (ids [2])
+[stub] POST /v1/messages x-api-key=stored-valid-looking-key -> 401
+Processed 1 job(s).
+--- 4. receipt_jobs
+Claimable now (a running worker would send these to the provider): 0
+Recent jobs (newest first, up to 5):
+  job | receipt | status | result | attempts | queued→finished s | last attempt s | model | in/out tokens | error
+  2 | 691a8c1b | failed | none | 1/2 | 1.5 | 1.0 | - | 0/0 | auth
+  1 | 691a8c1b | failed | none | 1/2 | 1.6 | 1.1 | - | 0/0 | auth
+Totals for listed jobs: 0 input / 0 output tokens; estimated list-price cost US$0.0000
+review page: failure shown True | manual Confirm available True
+purchases recorded: 0

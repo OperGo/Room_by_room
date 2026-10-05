@@ -17,7 +17,7 @@ business direction, samples and product feedback; founder approval is reserved f
 |---|---|---|---|
 | 1 | Runtime and persistence decision | 5 Oct | **Accepted** (cron every minute, paid PG18, free web) |
 | 2 | Five live receipts through accurate confirmed costs | 8 Oct | **In progress**: R1 done; R2–R5 and checks outstanding |
-| 3 | Everyday founder use and friction fixes | 11 Oct | Not started |
+| 3 | Everyday founder use and friction fixes | 11 Oct | **Prepared** (`docs/milestone-3-plan.md`); starts after Milestone 2 |
 | 4 | Retained-data and deployment readiness, including a recovery check | 14 Oct | Not started |
 | 5 | Final validation and founder go-live | 16 Oct | Not started |
 
@@ -61,10 +61,11 @@ Details: `docs/sprints/evidence/milestone-2-receipt-notes.md`; procedures: `docs
 | CTO | Collect `receipt_jobs` via the command swap; record the cron 24-hour cost projection |
 | CTO + founder | Run the controlled auth-failure check (`docs/receipt-runtime-decision.md`): mandatory empty-queue proof, then always restore. The founder taps Read and reports the owner evidence |
 | Founder | Provide R2–R5 samples (mixed documents allowed); check extracted values |
-| Claude | Consolidated Milestone 2 report once the evidence is in; Milestone 3 preparation that needs no samples |
+| Claude | Consolidated Milestone 2 report once the evidence is in; triage of the founder's Milestone 3 friction log |
 
 ## Releases
 
 | PR | Head SHA | CI | Merged | Deployed | Production verified |
 |---|---|---|---|---|---|
-| #1 Operating framework + lean CI (this ledger) | see handoff | see handoff | no | will auto-deploy on merge (application code unchanged) | CTO to verify both services report the merge SHA |
+| #1 Operating framework + lean CI | `6934f50` | green (run 3: SQLite, PostgreSQL 18) | **yes, `2765733`** (merge commit, CTO-authorised, head-SHA guarded) | auto-deploy of web and cron (application code unchanged) | pending CTO verification of both deployed SHAs |
+| #2 Milestone 3 plan + ledger update | see handoff | see handoff | no | docs only; will auto-deploy on merge | — |

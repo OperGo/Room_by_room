@@ -34,8 +34,9 @@ Room by Room is a phone-first renovation organiser (Django). Read this before ch
    head changes after review, return it for re-review.
 4. CI (`.github/workflows/ci.yml`) runs SQLite and disposable PostgreSQL 18 suites on standard runners with
    fictional data, no production credentials and no live API calls. Keep it green.
-5. After merging, deploy and **verify the deployed commit** on every affected service. Merged does not mean
-   deployed. Documentation/CI-only changes need no application redeploy.
+5. **Auto-Deploy is On** for web and cron (CTO decision): a reviewed merge into `sprint-2a` deploys both, and
+   the CTO verifies the deployed commit on each. Merged does not mean verified. **No direct pushes to
+   `sprint-2a`**; every change goes through a reviewed PR.
 6. Normal pushes only (no force-push or history rewriting); verify the remote SHA matches local HEAD.
 
 ## Reporting

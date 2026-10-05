@@ -57,7 +57,8 @@ version and expiry date.** None of these are secrets. Never send URLs containing
 - **Repository:** `OperGo/Room_by_room`
 - **Branch:** `sprint-2a`. Deploy the final preview-preparation commit named in the Sprint 2B report
   (Manual Deploy → "Deploy a specific commit", or "latest commit" if the branch head is that commit).
-- **Auto-Deploy:** **Off**
+- **Auto-Deploy:** **Off** (Sprint 2B setting; superseded 5 October 2026: the CTO keeps it **On**, see
+  `docs/deployment-render.md` → "Release procedure")
 
 ### B. Commands
 - **Build command:**

@@ -11,19 +11,19 @@ the CTO) and applied the setup below. Live receipt testing (R1–R5) is in progr
 |---|---|
 | Web service | **Free** (unchanged URL, owner and secret). `ANTHROPIC_API_KEY` set privately; deployed commit `9372c48`; `/healthz/` ok; "Read receipt automatically" shown. |
 | Database | Existing PostgreSQL 18 **upgraded in place to paid** `0.1c-256mb`, 1 GB (about US$6.30/month). Data, URL and owner kept; no expiry; Render managed backups. External access stays closed. |
-| Receipt reading | Cron Job `room-by-room-receipts`: Starter (US$0.00016/min), Frankfurt, `* * * * *`, `python manage.py process_receipts --once`, Auto-Deploy Off, deployed at `c85e964`, `ANTHROPIC_API_KEY` set via save-and-deploy. **Active.** First runs: without the key, "not configured" and `Claimable at start: 0 job(s)`; with the key, Claimable 0, Processed 0. |
+| Receipt reading | Cron Job `room-by-room-receipts`: Starter (US$0.00016/min), Frankfurt, `* * * * *`, `python manage.py process_receipts --once`, Auto-Deploy **On** (CTO decision, 5 October), deployed at `c85e964`, `ANTHROPIC_API_KEY` set via save-and-deploy. **Active.** First runs: without the key, "not configured" and `Claimable at start: 0 job(s)`; with the key, Claimable 0, Processed 0. |
 | Anthropic | `Room by Room` workspace; **US$5 monthly spend limit**; **auto-reload off**; **US$5 credit purchased** (the minimum purchase). The key is kept only in the founder's password manager. |
 
 `9372c48` and `c85e964` differ only in documentation, so the two services run the same application code. Later
 documentation-only commits need no redeploy.
 
-**Discrepancies observed by the CTO on Render (5 October 2026), not yet reconciled:**
+**Discrepancies observed by the CTO on Render (5 October 2026):**
 
 | Observed | This guide's intended state | Note |
 |---|---|---|
 | Web service and cron job both deployed at **`380c190`** | `9372c48` (web), `c85e964` (cron) | `380c190` has the same application code (later commits are documentation only). Consistent with auto-deploy picking up each documentation push. |
-| **Auto-Deploy enabled** on both services | **Off** on both | With it on, every push or merge to `sprint-2a` deploys both services immediately. **CTO decided Off on both; not yet applied.** |
-| A remaining **"mac temp"** database access rule | External access closed (no rules) | Left from the founder's laptop helper sessions. **CTO decided to remove only this rule; not yet applied.** |
+| **Auto-Deploy enabled** on both services | Originally Off | **Resolved: the CTO decided to keep it On** for both. Reviewed merges into `sprint-2a` deploy both services; the CTO verifies them afterwards. No direct pushes to `sprint-2a`. |
+| A remaining **"mac temp"** database access rule | External access closed (no rules) | **Resolved:** the founder removed it, and the CTO independently verified that external access is closed (5 October). |
 
 Operating framework (5 October 2026): the CTO has Render access (Sunday.Je workspace → Room by Room) and runs
 deployments, verification and the Render-side procedures below. The founder supplies samples, checks values and
@@ -158,7 +158,7 @@ on **both** the cron job and the web service.
    - Branch `sprint-2a` at the final tested SHA.
    - Schedule `* * * * *`.
    - Build command `pip install -r requirements.txt`. Command `python manage.py process_receipts --once`.
-   - Instance type **Starter**. Auto-Deploy **Off**.
+   - Instance type **Starter**. Auto-Deploy **Off**. (Superseded 5 October: the CTO keeps Auto-Deploy **On**.)
    - Environment, set on the cron job itself:
 
      | Key | Value |

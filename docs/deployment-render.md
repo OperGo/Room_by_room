@@ -16,16 +16,15 @@ The CTO owns technical delivery and has Render access (Sunday.Je workspace → R
 1. Claude opens one bounded PR into **`sprint-2a`** with its head SHA, test results and migration notes. CI
    (SQLite and PostgreSQL 18) must be green.
 2. The CTO reviews the actual changes and merges only the reviewed head.
-3. Deploy the merged commit to every affected service (web and, for application changes, the cron job) and
-   **verify the deployed commit** on each. Migrations run on web start (`migrate --noinput`).
+3. The merge auto-deploys the web service and the cron job; **verify the deployed commit** on each. Migrations run on web start (`migrate --noinput`).
 4. Production checks: `/healthz/` ok; the cron job's next run logs `Claimable at start: …`; for receipt
    changes, one owner reading. Documentation/CI-only merges need no redeploy.
 5. Founder approval is needed only for the reserved categories in `AGENTS.md` (spending, material product
    changes, launch/communications, personal-information handling, destructive or data-risk actions).
 
-**Auto-Deploy:** observed **on** for both services (CTO, 5 October 2026). The CTO decided **Off** on both;
-this is **not yet applied**. Until it is, a merge to `sprint-2a` deploys immediately and must be verified as a
-release. See `docs/receipt-runtime-decision.md` → "Discrepancies".
+**Auto-Deploy is On** for the web service and the cron job (CTO decision, 5 October 2026). A reviewed merge
+into `sprint-2a` therefore deploys both services; the CTO verifies the deployed commit on each afterwards.
+**No direct pushes to `sprint-2a`**: every change reaches it through a reviewed PR.
 
 **`render.yaml` is not any of these.** It is a Blueprint for a **separate, brand-new install**. It assumes:
 - a new PostgreSQL **16** database;

@@ -26,8 +26,8 @@ business direction, samples and product feedback; founder approval is reserved f
 | Item | Evidence | Source |
 |---|---|---|
 | Web (free) and cron job both deployed at `380c190` (application code identical to `c85e964`) | observed | production (CTO-observed, 5 Oct) |
-| Auto-Deploy **on** for both services | **CTO decided: Off on web and cron. Not yet applied** (the CTO's Render plugin lacks this update operation) | production (CTO-observed) |
-| "mac temp" external database access rule still present | **CTO decided: remove only this temporary Mac rule. Not yet applied** (same limitation) | production (CTO-observed) |
+| Auto-Deploy **on** for both services | **Kept On by CTO decision**: reviewed merges into `sprint-2a` deploy both; the CTO verifies afterwards | production (CTO-observed) |
+| "mac temp" database access rule | **Removed by the founder; external access verified closed** | founder action; production (CTO-verified, 5 Oct) |
 | PostgreSQL 18 paid `0.1c-256mb`; cron `* * * * *` Starter; API key on both services | as applied | founder-reported (4 Oct) |
 | Anthropic workspace: US$5 monthly limit, auto-reload off; US$5 bought, about US$0.01 used | | founder-reported (4 Oct) |
 | Cron cost so far: US$0.01 (elapsed period not yet recorded) | 24-hour projection outstanding | founder-reported (4 Oct) |
@@ -47,18 +47,17 @@ business direction, samples and product feedback; founder approval is reserved f
 Details: `docs/sprints/evidence/milestone-2-receipt-notes.md`; procedures: `docs/receipt-runtime-decision.md`.
 
 ## CTO decisions (5 October 2026)
-1. **Auto-Deploy Off** on the web service and the cron job. Decided; **not yet applied**. Until it is applied,
-   every push or merge to `sprint-2a` deploys both services, and must be verified as a release.
-2. **Remove only the temporary "mac temp" database access rule.** Decided; **not yet applied**.
-
-Both need a Render dashboard edit that the CTO's Render plugin cannot perform. That edit is the smallest
-remaining access action: someone with dashboard access applies the two settings, and the CTO verifies them.
+1. **Auto-Deploy stays On** for the web service and the cron job; this supersedes the earlier Off decision.
+   Reviewed merges into `sprint-2a` deploy both services, and the CTO verifies them afterwards. **No direct
+   pushes to `sprint-2a`.**
+2. **"mac temp" database access rule: removed** by the founder; the CTO verified that external access is
+   closed. No further founder Render action is needed.
 
 ## Next actions
 
 | Owner | Action |
 |---|---|
-| CTO | Review PR #1's revised head; have the two decided Render settings applied, then verify them |
+| CTO | Final review of PR #1's head; authorise the merge; verify both auto-deployments |
 | CTO | Collect `receipt_jobs` via the command swap; record the cron 24-hour cost projection |
 | CTO + founder | Run the controlled auth-failure check (`docs/receipt-runtime-decision.md`): mandatory empty-queue proof, then always restore. The founder taps Read and reports the owner evidence |
 | Founder | Provide R2–R5 samples (mixed documents allowed); check extracted values |
@@ -68,4 +67,4 @@ remaining access action: someone with dashboard access applies the two settings,
 
 | PR | Head SHA | CI | Merged | Deployed | Production verified |
 |---|---|---|---|---|---|
-| Operating framework + lean CI (this ledger) | see handoff | see handoff | no | not needed (docs/CI/tests only) | — |
+| #1 Operating framework + lean CI (this ledger) | see handoff | see handoff | no | will auto-deploy on merge (application code unchanged) | CTO to verify both services report the merge SHA |

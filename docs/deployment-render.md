@@ -23,8 +23,9 @@ The CTO owns technical delivery and has Render access (Sunday.Je workspace → R
 5. Founder approval is needed only for the reserved categories in `AGENTS.md` (spending, material product
    changes, launch/communications, personal-information handling, destructive or data-risk actions).
 
-**Open discrepancy:** Auto-Deploy was observed **on** for both services (CTO, 5 October 2026), so a merge to
-`sprint-2a` currently deploys immediately. See `docs/receipt-runtime-decision.md` → "Discrepancies".
+**Auto-Deploy:** observed **on** for both services (CTO, 5 October 2026). The CTO decided **Off** on both;
+this is **not yet applied**. Until it is, a merge to `sprint-2a` deploys immediately and must be verified as a
+release. See `docs/receipt-runtime-decision.md` → "Discrepancies".
 
 **`render.yaml` is not any of these.** It is a Blueprint for a **separate, brand-new install**. It assumes:
 - a new PostgreSQL **16** database;

@@ -2,6 +2,7 @@ import uuid as uuid_lib
 
 from django.contrib import messages
 from django.http import Http404
+from django.db.models import OuterRef, Subquery
 from django.shortcuts import redirect, render
 
 from apps.core.exceptions import BusinessRuleError, StaleObjectError
@@ -9,7 +10,7 @@ from apps.core.models import ChangeEvent
 from apps.core.money import ZERO, to_money
 from apps.core.shortcuts import parse_uuid, owned
 from apps.projects.models import Project
-from apps.receipts.models import ReceiptDraft
+from apps.receipts.models import ExtractionJob, ReceiptDraft
 from apps.shopping.models import ShoppingItem
 
 from . import selectors, services
@@ -40,10 +41,12 @@ def cost_index(request):
             "project": project, "net": net,
             "remaining": project.budget - net if project.budget is not None else None,
         })
-    drafts = (
+    latest_job = ExtractionJob.objects.filter(draft=OuterRef("pk")).order_by("-created_at", "-id")
+    drafts = [_draft_row(d) for d in (
         ReceiptDraft.objects.for_owner(owner).filter(review_status=ReceiptDraft.ReviewStatus.DRAFT)
         .select_related("document").order_by("-created_at")
-    )
+        .annotate(job_status=Subquery(latest_job.values("status")[:1]))
+    )]
     return render(request, "costs/index.html", {
         "form": form, "summary": summary, "purchases": purchases, "drafts": drafts,
         "project_rows": project_rows, "filtered": bool(filters),
@@ -76,6 +79,28 @@ def _overlaps_for(request, editor, correcting=None):
 def _needs_choices(overlaps):
     return any(getattr(o, "choice", None) is None or o.choice.decision not in OpeningBalanceDecision.Decision.values
                for o in overlaps)
+
+
+DRAFT_STATES = {  # latest reading job status -> (label, badge style); display only
+    ExtractionJob.Status.QUEUED: ("Waiting to read", "badge-outline"),
+    ExtractionJob.Status.PROCESSING: ("Reading", "badge-outline"),
+    ExtractionJob.Status.SUCCEEDED: ("Read · check", "badge-warning"),
+    ExtractionJob.Status.FAILED: ("Couldn’t read", "badge-error"),
+}
+
+
+def _draft_row(draft):
+    """Display values for a receipt draft row. Draft values are shown, never counted: totals come only
+    from confirmed records (selectors)."""
+    data = draft.data or {}
+    total = None
+    try:
+        total = to_money(str(data.get("total") or "")) if data.get("total") else None
+    except ValueError:
+        total = None  # the owner may have saved an unfinished value; show nothing rather than a guess
+    label, style = DRAFT_STATES.get(draft.job_status, ("Draft", "badge-draft"))
+    return {"draft": draft, "merchant": (data.get("merchant") or "").strip(), "total": total,
+            "state": label, "state_style": style}
 
 
 def purchase_create(request):

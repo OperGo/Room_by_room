@@ -85,3 +85,4 @@ Details: `docs/assessments/2026-10-05-product-assessment.md`.
 | #2 Milestone 3 plan + ledger update | `935e4d9` | green (SQLite, PostgreSQL 18) | **yes, `6ceefd6`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron at `6ceefd6`** (CTO-verified) | verified by the CTO |
 | #3 Sign-in layout and form finish (gaps 3, 4) + assessment | see handoff | see handoff | no | will auto-deploy on merge (templates, CSS, form labels; no migrations) | — |
 | #4 Assign unassigned items to a project (gap 1) | see handoff | see handoff | no | will auto-deploy on merge; **migration** `receipts.0003` (nullable FK + index) | — |
+| #5 Distinguish receipt drafts on Costs (gap 5) | see handoff | see handoff | no | will auto-deploy on merge (view and template only; no migrations) | — |

@@ -17,11 +17,12 @@
 {% if drafts %}
 <section class="section" id="drafts" style="margin-top:0;margin-bottom:22px">
   <div class="section-head"><h2>Receipts to review</h2><span class="badge badge-draft">Draft · not counted</span></div>
-  <ul class="list card">{% for d in drafts %}
+  <ul class="list card">{% for row in drafts %}{% with d=row.draft %}
     <li><a class="row" href="{% url 'receipts:review' d.uuid %}"><span class="thumb">{% icon "file-text" 22 %}</span>
-      <span class="row-main"><span class="row-title">{{ d.data.merchant|default:"Receipt" }}{% if d.data.description %} · {{ d.data.description }}{% endif %}</span>
-        <span class="row-meta">Uploaded {{ d.created_at|date:"j M Y, H:i" }}{% if d.document.original_filename %} · {{ d.document.original_filename|truncatechars:32 }}{% endif %}</span></span>
-      <span class="badge badge-draft">Draft</span><span class="chev">{% icon "chevron-right" 18 %}</span></a></li>{% endfor %}
+      <span class="row-main"><span class="row-title">{{ row.merchant|default:"Receipt" }}{% if row.total is not None %} · {{ row.total|gbp }}<span class="visually-hidden"> (draft total, not counted)</span>{% endif %}</span>
+        <span class="row-meta">Uploaded {{ d.created_at|date:"j M, H:i" }}{% if not row.merchant and d.document.original_filename %} · {{ d.document.original_filename|truncatechars:32 }}{% endif %}</span>
+        <span class="draft-state"><span class="badge {{ row.state_style }}">{{ row.state }}</span></span></span>
+      <span class="chev">{% icon "chevron-right" 18 %}</span></a></li>{% endwith %}{% endfor %}
   </ul>
 </section>
 {% endif %}

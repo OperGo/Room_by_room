@@ -5,6 +5,8 @@
   <div class="topbar-title"><h1>Add receipt</h1></div></header>
 
 <form method="post" enctype="multipart/form-data" data-receipt-upload style="max-width:860px">{% csrf_token %}
+  {% if context_project %}<input type="hidden" name="project" value="{{ context_project.uuid }}">
+  <p class="small muted" style="margin:0 0 10px">For <strong>{{ context_project.title }}</strong>: you can assign the items to it in one step when you review.</p>{% endif %}
   {% if form.receipt.errors %}<div class="alert alert-error" role="alert">{% icon "triangle-alert" 18 %}<div>{{ form.receipt.errors|join:" " }}</div></div>{% endif %}
   <div class="upload-options">
     <label class="upload-option"><span class="opt-icon">{% icon "camera" 22 %}</span><span>Take photo<small>Use the camera</small></span>
@@ -25,6 +27,6 @@
 
 <div class="card card-pad" style="max-width:860px;margin-top:8px">
   <div class="kv" style="align-items:center"><div><h2 style="font-size:17px">No receipt?</h2><p class="small muted" style="margin:0">Enter a purchase manually. A file is never required.</p></div>
-  <a class="btn btn-secondary" href="{% url 'costs:purchase_create' %}">{% icon "pencil" 18 %}Manual entry</a></div>
+  <a class="btn btn-secondary" href="{% url 'costs:purchase_create' %}{% if context_project %}?project={{ context_project.uuid }}{% endif %}">{% icon "pencil" 18 %}Manual entry</a></div>
 </div>
 {% endblock %}

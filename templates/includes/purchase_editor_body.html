@@ -1,6 +1,19 @@
 {% load rbr %}
 <div data-purchase-editor>
   <h2 class="section-h">Items &amp; projects</h2>
+  {% if assign_action %}
+  <div class="bulk-assign" data-bulk-assign>
+    <label for="bulk-dest">Assign unassigned items to</label>
+    <div class="bulk-row">
+      <select id="bulk-dest" name="bulk_dest" data-bulk-dest>
+        <option value="">Choose project…</option>
+        {% for value, label in destinations %}<option value="{{ value }}" {% if bulk_default == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-secondary btn-sm" type="submit" name="assign_unassigned" value="1" formaction="{{ assign_action }}" formnovalidate data-bulk-apply>Assign</button>
+    </div>
+    <p class="help" data-bulk-note aria-live="polite">Items that already have a project, and split items, are left as they are.</p>
+  </div>
+  {% endif %}
   <div class="lines-stack" data-lines>
     {% for line in editor.lines %}{% with i=forloop.counter0 %}{% include "includes/purchase_line.html" %}{% endwith %}{% endfor %}
   </div>

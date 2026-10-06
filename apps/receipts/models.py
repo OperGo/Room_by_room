@@ -123,6 +123,11 @@ class ReceiptDraft(models.Model):
         "costs.Purchase", null=True, blank=True, on_delete=models.SET_NULL, related_name="attached_drafts"
     )
     duplicate_acknowledged = models.BooleanField(default=False)
+    context_project = models.ForeignKey(
+        "projects.Project", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        help_text="The owner's project this receipt was started from. Only pre-selects the 'Assign unassigned "
+                  "items to' choice; it never allocates or records anything by itself.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     version = models.PositiveIntegerField(default=1)

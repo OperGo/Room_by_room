@@ -70,7 +70,7 @@
     </div>
     <div class="stack">
       <a class="btn" href="{% url 'costs:purchase_create' %}?project={{ project.uuid }}">{% icon "plus" 18 %}Add purchase</a>
-      <a class="btn btn-secondary" href="{% url 'receipts:new' %}">{% icon "camera" 18 %}Add receipt</a>
+      <a class="btn btn-secondary" href="{% url 'receipts:new' %}?project={{ project.uuid }}">{% icon "camera" 18 %}Add receipt</a>
       <a class="btn btn-secondary" href="{% url 'projects:opening_balance_create' project.uuid %}">{% icon "history" 18 %}Add opening balance</a>
     </div>
   </div>

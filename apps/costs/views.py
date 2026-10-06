@@ -13,7 +13,7 @@ from apps.receipts.models import ReceiptDraft
 from apps.shopping.models import ShoppingItem
 
 from . import selectors, services
-from .forms import CostFilterForm, PurchaseEditor, ReasonForm, RefundForm, destination_options
+from .forms import CostFilterForm, PurchaseEditor, ReasonForm, RefundForm, destination_options, owned_project_key
 from .models import CostAllocation, OpeningBalanceDecision, Purchase
 
 
@@ -80,6 +80,8 @@ def _needs_choices(overlaps):
 
 def purchase_create(request):
     owner = request.user
+    bulk = {"assign_action": request.get_full_path(),
+            "bulk_default": request.POST.get("bulk_dest") or owned_project_key(owner, request.GET.get("project"))}
     shopping_item = None
     if request.GET.get("shopping"):
         shopping_item = ShoppingItem.objects.for_owner(owner).filter(uuid=parse_uuid(request.GET["shopping"])).select_related(
@@ -90,22 +92,35 @@ def purchase_create(request):
     if request.method == "POST":
         editor = PurchaseEditor(owner, request.POST)
         submission_key = _submission_key(request)
+        if request.POST.get("assign_unassigned"):
+            # Without JavaScript: fill unassigned items and show the form again. Nothing is recorded.
+            editor.is_valid()
+            editor.errors = []
+            try:
+                count = editor.assign_unassigned(request.POST.get("bulk_dest", ""))
+                messages.info(request, f"Assigned {count} item{'' if count == 1 else 's'}. Nothing is recorded "
+                                       "until you choose Record purchase.")
+            except ValueError:
+                editor.errors = ["Choose a project to assign the unassigned items to."]
+            return render(request, "costs/purchase_form.html", _editor_context(
+                request, editor, overlaps=[], submission_key=submission_key, creating=True,
+                **bulk))
         if editor.is_valid():
             overlaps = _overlaps_for(request, editor)
             if overlaps and _needs_choices(overlaps):
                 return render(request, "costs/purchase_form.html", _editor_context(
-                    request, editor, overlaps=overlaps, submission_key=submission_key, creating=True))
+                    request, editor, overlaps=overlaps, submission_key=submission_key, creating=True, **bulk))
             try:
                 purchase = services.post_purchase(owner, editor.purchase_input, submission_key=submission_key,
                                                   balance_choices=editor.balance_choices)
             except BusinessRuleError as exc:
                 editor.errors = exc.messages
                 return render(request, "costs/purchase_form.html", _editor_context(
-                    request, editor, overlaps=overlaps, submission_key=submission_key, creating=True))
+                    request, editor, overlaps=overlaps, submission_key=submission_key, creating=True, **bulk))
             messages.success(request, "Purchase recorded.")
             return redirect("costs:purchase_detail", uuid=purchase.uuid)
         return render(request, "costs/purchase_form.html", _editor_context(
-            request, editor, overlaps=[], submission_key=submission_key, creating=True))
+            request, editor, overlaps=[], submission_key=submission_key, creating=True, **bulk))
 
     initial = {"transaction_date": ""}
     project = None
@@ -124,7 +139,7 @@ def purchase_create(request):
     initial["transaction_date"] = local_today().isoformat()
     editor = PurchaseEditor(owner, initial=initial)
     return render(request, "costs/purchase_form.html", _editor_context(
-        request, editor, submission_key=uuid_lib.uuid4(), creating=True, shopping_item=shopping_item))
+        request, editor, submission_key=uuid_lib.uuid4(), creating=True, shopping_item=shopping_item, **bulk))
 
 
 def _submission_key(request):

@@ -10,6 +10,7 @@ import pytest
 from PIL import Image
 from playwright.sync_api import expect
 
+from apps.costs.models import Purchase
 from apps.costs.selectors import overall_summary, project_cost_summary  # noqa: F401
 from apps.projects.models import Project
 
@@ -530,3 +531,73 @@ def test_form_finish_on_affected_screens(browser, live_server, owner, label):
         # Same row: the inputs' bottom edges line up (a date input is a couple of pixels taller).
         assert abs((date["y"] + date["height"]) - (merchant["y"] + merchant["height"])) <= 1, (merchant, date)
     context.close()
+
+
+# ------------------------------------------------------------------ assessment gap 1: assign unassigned items
+
+
+def test_phone_project_receipt_read_assign_once_and_confirm(phone, live_server, owner, settings):
+    from apps.receipts.jobs import process_available
+
+    settings.RECEIPT_EXTRACTOR = "fake"
+    office = Project.objects.create(owner=owner, title="Office")
+    Project.objects.create(owner=owner, title="Hallway")
+    page = phone
+    sign_in(page, live_server)
+    page.goto(f"{live_server.url}/projects/{office.uuid}/?tab=costs")
+    page.get_by_role("link", name="Add receipt").last.click()
+    expect(page.get_by_text("For Office")).to_be_visible()
+    buf = io.BytesIO()
+    Image.new("RGB", (300, 500), "white").save(buf, format="JPEG")
+    page.set_input_files("input[aria-label='Upload a receipt image']",
+                         files=[{"name": "receipt.jpg", "mimeType": "image/jpeg", "buffer": buf.getvalue()}])
+    page.wait_for_url("**/receipts/*/")
+    page.get_by_role("button", name="Read receipt automatically").click()
+    process_available()
+    expect(page.get_by_text("Synthetic test reading")).to_be_visible(timeout=15000)
+    bulk = page.locator("#bulk-dest")
+    expect(bulk).to_have_value(f"project:{office.uuid}")
+    selects = page.locator("[data-line] [data-alloc-dest]")
+    assert selects.count() == 5 and all(not v for v in selects.evaluate_all("els => els.map(e => e.value)"))
+    assign = page.get_by_role("button", name="Assign", exact=True)
+    assert _visible_and_unobstructed(page, assign) and assign.bounding_box()["height"] >= 44
+    assert no_horizontal_scroll(page)
+    assign.click()
+    expect(page.locator("[data-bulk-note]")).to_contain_text("Assigned 5 items to Office")
+    assert set(selects.evaluate_all("els => els.map(e => e.value)")) == {f"project:{office.uuid}"}
+    expect(page.locator("[data-reconcile-status]")).to_have_text("Matches total")
+    assert Purchase.objects.count() == 0  # assigning in the browser records nothing
+    page.get_by_role("button", name="Confirm purchase").click()
+    expect(page.get_by_text("Receipt confirmed and purchase recorded.")).to_be_visible()
+    assert project_cost_summary(office).net == Decimal("31.17") == overall_summary(owner).total
+
+
+def test_desktop_assign_keeps_chosen_and_split_lines(desktop, live_server, owner):
+    office = Project.objects.create(owner=owner, title="Office")
+    hallway = Project.objects.create(owner=owner, title="Hallway")
+    page = desktop
+    sign_in(page, live_server)
+    page.goto(f"{live_server.url}/costs/purchases/new/")
+    page.fill("#l0-desc", "Chosen")
+    page.fill("#l0-amt", "10.00")
+    page.select_option("#l0-a0-dest", f"project:{hallway.uuid}")
+    page.get_by_role("button", name="Add item", exact=True).click()
+    page.fill("#l1-desc", "Split")
+    page.fill("#l1-amt", "8.00")
+    page.select_option("#l1-a0-dest", "")
+    line = page.locator("[data-line]").nth(1)
+    line.locator("summary").click()
+    line.get_by_role("button", name="Split between projects").click()
+    page.fill("#l1-a0-amt", "5.00")
+    page.get_by_role("button", name="Add item", exact=True).click()
+    page.fill("#l2-desc", "Unset")
+    page.fill("#l2-amt", "4.00")
+    page.select_option("#l2-a0-dest", "")
+    page.select_option("#bulk-dest", f"project:{office.uuid}")
+    url = page.url
+    page.get_by_role("button", name="Assign", exact=True).click()
+    expect(page.locator("[data-bulk-note]")).to_contain_text("Assigned 1 item to Office")
+    assert page.url == url and Purchase.objects.count() == 0  # no submission
+    assert page.input_value("#l0-a0-dest") == f"project:{hallway.uuid}"
+    assert page.input_value("#l1-a0-dest") == "" and page.input_value("#l1-a1-dest") == ""  # split untouched
+    assert page.input_value("#l2-a0-dest") == f"project:{office.uuid}"

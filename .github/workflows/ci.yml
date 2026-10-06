@@ -5,6 +5,8 @@ name: CI
 on:
   pull_request:
     branches: [sprint-2a]
+    # "edited" also covers a stacked PR retargeted to sprint-2a, which the default types do not.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [sprint-2a]
 

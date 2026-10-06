@@ -61,11 +61,26 @@ Details: `docs/sprints/evidence/milestone-2-receipt-notes.md`; procedures: `docs
 | CTO | Collect `receipt_jobs` via the command swap; record the cron 24-hour cost projection |
 | CTO + founder | Run the controlled auth-failure check (`docs/receipt-runtime-decision.md`): mandatory empty-queue proof, then always restore. The founder taps Read and reports the owner evidence |
 | Founder | Provide R2–R5 samples (mixed documents allowed); check extracted values |
+| CTO | Review the sign-in and form-finish PR (assessment gaps 3 and 4); then the allocation-shortcut PR (gap 1) and the receipt-drafts PR (gap 5), as instructed on 5 October |
 | Claude | Consolidated Milestone 2 report once the evidence is in; triage of the founder's Milestone 3 friction log |
+
+## Product assessment (5 October 2026)
+
+Local build of `6ceefd6` with fictional demo data, captured at 390/768/1440 px. Receipt states are from the
+fake extractor or a local worker; the only live evidence is R1 (founder-reported). Missing approved scope:
+none found. Top gaps, ranked:
+1. Receipt allocation takes one choice per line; project context is lost (fix before launch).
+2. Free-tier cold start: unmeasured; paid web would need founder approval.
+3. Sign-in broken at 1024 px and wider (layout bug).
+4. Form finish defects.
+5. "Receipts to review" rows are indistinguishable.
+
+Details: `docs/assessments/2026-10-05-product-assessment.md`.
 
 ## Releases
 
 | PR | Head SHA | CI | Merged | Deployed | Production verified |
 |---|---|---|---|---|---|
-| #1 Operating framework + lean CI | `6934f50` | green (run 3: SQLite, PostgreSQL 18) | **yes, `2765733`** (merge commit, CTO-authorised, head-SHA guarded) | auto-deploy of web and cron (application code unchanged) | pending CTO verification of both deployed SHAs |
-| #2 Milestone 3 plan + ledger update | see handoff | see handoff | no | docs only; will auto-deploy on merge | — |
+| #1 Operating framework + lean CI | `6934f50` | green (run 3: SQLite, PostgreSQL 18) | **yes, `2765733`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `2765733`** (CTO-verified) | cron: later runs succeeded (CTO-verified); **web health pending** (Render log query timed out) |
+| #2 Milestone 3 plan + ledger update | `935e4d9` | green (SQLite, PostgreSQL 18) | **yes, `6ceefd6`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron at `6ceefd6`** (CTO-verified) | verified by the CTO |
+| #3 Sign-in layout and form finish (gaps 3, 4) + assessment | see handoff | see handoff | no | will auto-deploy on merge (templates, CSS, form labels; no migrations) | — |

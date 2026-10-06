@@ -177,3 +177,32 @@ def test_sign_out_needs_post_and_csrf(owner):
     assert c.get(reverse("accounts:logout")).status_code == 405  # a GET never signs out
     assert c.post(reverse("accounts:logout")).status_code == 403  # no CSRF token
     assert c.get(reverse("core:home")).status_code == 200  # still signed in
+
+
+# ------------------------------------------------------------------ form finish (assessment gaps 3 and 4)
+
+
+def test_sign_in_page_has_no_sidebar_grid_but_signed_in_pages_do(client, client_owner):
+    from django.test import Client
+
+    signed_out = Client().get(reverse("accounts:login")).content.decode()
+    assert '<div class="app">' in signed_out and "has-nav" not in signed_out
+    assert '<div class="app has-nav">' in client_owner.get(reverse("core:home")).content.decode()
+
+
+@pytest.mark.parametrize("url_name", ["projects:create", "shopping:create"])
+def test_optional_marker_appears_once_per_label(client_owner, url_name):
+    page = client_owner.get(reverse(url_name)).content.decode()
+    assert "(optional) <span" not in page and "(optional)</label>" not in page
+    assert "leave empty for shared)" not in page
+
+
+def test_task_form_optional_labels_are_not_duplicated(client_owner, office):
+    page = client_owner.get(reverse("projects:task_create", args=[office.uuid])).content.decode()
+    assert page.count("(optional)") == 3  # estimate, due date, notes: once each
+    assert "Estimated minutes <span" in page and "Due date <span" in page
+
+
+def test_shopping_task_choice_has_meaningful_empty_option(client_owner):
+    page = client_owner.get(reverse("shopping:create")).content.decode()
+    assert "Not linked to a task" in page and "---------" not in page

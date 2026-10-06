@@ -14,7 +14,7 @@
 <body>
 {% include "includes/icon_sprite.svg" %}
 <a class="skip-link" href="#content">Skip to content</a>
-<div class="app">
+<div class="app{% if user.is_authenticated %} has-nav{% endif %}">
   {% if user.is_authenticated %}
   <nav class="side-nav" aria-label="Main">
     <a class="brand" href="{% url 'core:home' %}"><span class="brand-mark">{% icon "layers" 20 %}</span><span class="wordmark" style="font-size:19px">Room by Room</span></a>

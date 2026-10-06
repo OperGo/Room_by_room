@@ -31,7 +31,9 @@ truncated (merchant 120, descriptions 160 characters); long digit runs (card/acc
 1. Upload (photo, image, HEIC, PDF) → private storage → empty draft. Checksum duplicates warn.
 2. **Read receipt automatically** (POST, with draft version) → one `ExtractionJob` (one active job per
    document; double taps return the same job). The page says what is sent and to whom.
-3. Worker: `python manage.py process_receipts --watch` (or `--once` from cron/tests) claims jobs.
+3. Worker: `python manage.py process_receipts --watch` (or `--once` from cron/tests) claims jobs. Before claiming
+   anything it checks that all database migrations are applied; if not, `--once` logs a deferral and exits
+   successfully, and `--watch` waits and re-checks. Jobs, attempts, leases and drafts are untouched meanwhile.
 4. Result is normalised server-side and applied to the draft **only** if the draft is still open and at
    the version recorded at request time. Otherwise it is *held* (owner edited meanwhile; offered with
    "Replace my values with the reading") or *discarded* (draft already confirmed/attached/discarded).

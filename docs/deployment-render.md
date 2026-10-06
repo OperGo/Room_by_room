@@ -17,6 +17,9 @@ The CTO owns technical delivery and has Render access (Sunday.Je workspace → R
    (SQLite and PostgreSQL 18) must be green.
 2. The CTO reviews the actual changes and merges only the reviewed head.
 3. The merge auto-deploys the web service and the cron job; **verify the deployed commit** on each. Migrations run on web start (`migrate --noinput`).
+   If the cron job starts the new code before the web service has migrated, `process_receipts` logs
+   `Deferred: database migrations not yet applied (…)` and exits without claiming, changing or sending any job;
+   a later scheduled run reads normally once the web deploy has migrated. No upload pause is needed.
 4. Production checks: `/healthz/` ok; the cron job's next run logs `Claimable at start: …`; for receipt
    changes, one owner reading. Documentation/CI-only merges need no redeploy.
 5. Founder approval is needed only for the reserved categories in `AGENTS.md` (spending, material product

@@ -84,4 +84,4 @@ Details: `docs/assessments/2026-10-05-product-assessment.md`.
 | #1 Operating framework + lean CI | `6934f50` | green (run 3: SQLite, PostgreSQL 18) | **yes, `2765733`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `2765733`** (CTO-verified) | cron: later runs succeeded (CTO-verified); **web health pending** (Render log query timed out) |
 | #2 Milestone 3 plan + ledger update | `935e4d9` | green (SQLite, PostgreSQL 18) | **yes, `6ceefd6`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron at `6ceefd6`** (CTO-verified) | verified by the CTO |
 | #3 Sign-in layout and form finish (gaps 3, 4) + assessment | see handoff | see handoff | no | will auto-deploy on merge (templates, CSS, form labels; no migrations) | — |
-| #4 Assign unassigned items to a project (gap 1) | see handoff | see handoff | no | will auto-deploy on merge; **migration** `receipts.0003` (nullable FK + index) | — |
+| #4 Assign unassigned items to a project (gap 1) | see handoff | see handoff | no | will auto-deploy on merge; **migration** `receipts.0003` (nullable FK + index); the worker defers while migrations are pending (no upload pause) | — |

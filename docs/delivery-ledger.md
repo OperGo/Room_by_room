@@ -18,19 +18,19 @@ business direction, samples and product feedback; founder approval is reserved f
 | 1 | Runtime and persistence decision | 5 Oct | **Accepted** (cron every minute, paid PG18, free web) |
 | 2 | Five live receipts through accurate confirmed costs | 8 Oct | **In progress**: R1 done; R2–R5 and checks outstanding |
 | 3 | Everyday founder use and friction fixes | 11 Oct | **Prepared** (`docs/milestone-3-plan.md`); starts after Milestone 2 |
-| 4 | Retained-data and deployment readiness, including a recovery check | 14 Oct | Not started |
+| 4 | Retained-data and deployment readiness, including a recovery check | 14 Oct | **Route A selected** (CTO, 6 Oct); helper PR in review; drill awaits the exact quote and approval |
 | 5 | Final validation and founder go-live | 16 Oct | Not started |
 
 ## Current production state
 
 | Item | Evidence | Source |
 |---|---|---|
-| Web (free) and cron job both deployed at `380c190` (application code identical to `c85e964`) | observed | production (CTO-observed, 5 Oct) |
+| Web (free) and cron job live at `e99637a` (PR #5); migration `receipts.0003` applied (PR #4) | verified | production (CTO-verified, 6 Oct) |
 | Auto-Deploy **on** for both services | **Kept On by CTO decision**: reviewed merges into `sprint-2a` deploy both; the CTO verifies afterwards | production (CTO-observed) |
 | "mac temp" database access rule | **Removed by the founder; external access verified closed** | founder action; production (CTO-verified, 5 Oct) |
 | PostgreSQL 18 paid `0.1c-256mb`; cron `* * * * *` Starter; API key on both services | as applied | founder-reported (4 Oct) |
 | Anthropic workspace: US$5 monthly limit, auto-reload off; US$5 bought, about US$0.01 used | | founder-reported (4 Oct) |
-| Cron cost so far: US$0.01 (elapsed period not yet recorded) | 24-hour projection outstanding | founder-reported (4 Oct) |
+| Cron cost so far: US$0.01 (elapsed period not yet recorded) | projection over a known elapsed period outstanding (CTO, Render usage) | founder-reported (4 Oct) |
 
 ## Milestone 2 evidence
 
@@ -57,11 +57,10 @@ Details: `docs/sprints/evidence/milestone-2-receipt-notes.md`; procedures: `docs
 
 | Owner | Action |
 |---|---|
-| CTO | Collect `receipt_jobs` via the command swap; record the cron 24-hour cost projection |
-| CTO + founder | Run the controlled auth-failure check (`docs/receipt-runtime-decision.md`): mandatory empty-queue proof, then always restore. The founder taps Read and reports the owner evidence |
 | Founder | Provide R2–R5 samples (mixed documents allowed); check extracted values |
-| CTO | Verify PR #4 deployment (`10c8b3a`: web, cron, migration `receipts.0003`, health); review PR #5 (gap 5) |
-| Claude | Consolidated Milestone 2 report once the evidence is in; triage of the founder's Milestone 3 friction log |
+| CTO | Review the recovery-helper PR (`restore_fingerprint --database-url-env`); later approve the exact temporary-instance quote before any drill |
+| CTO + founder | Run the consolidated owner test session (`docs/owner-test-session.md`): R2–R5, failure check, metadata, spend, cron cost |
+| Claude | Consolidated Milestone 2 report once the evidence is in (structure: `docs/sprints/milestone-2-report-draft.md`); triage of the founder's Milestone 3 friction log; prepare the chosen recovery check |
 
 ## Product assessment (5 October 2026)
 
@@ -83,5 +82,5 @@ Details: `docs/assessments/2026-10-05-product-assessment.md`.
 | #1 Operating framework + lean CI | `6934f50` | green (run 3: SQLite, PostgreSQL 18) | **yes, `2765733`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `2765733`** (CTO-verified) | cron: later runs succeeded (CTO-verified); **web health pending** (Render log query timed out) |
 | #2 Milestone 3 plan + ledger update | `935e4d9` | green (SQLite, PostgreSQL 18) | **yes, `6ceefd6`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron at `6ceefd6`** (CTO-verified) | verified by the CTO |
 | #3 Sign-in layout and form finish (gaps 3, 4) + assessment | `060ac91` | green (SQLite, PostgreSQL 18) | **yes, `b08919d`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `b08919d`** (CTO-verified) | **verified** (CTO): `/healthz/` HTTP 200 `{"status":"ok"}`; later scheduled cron runs succeeded |
-| #4 Assign unassigned items to a project (gap 1) + worker migration guard | `c562102` | green (SQLite, PostgreSQL 18) | **yes, `10c8b3a`** (merge commit, CTO-authorised, head-SHA guarded) | auto-deploy; **migration** `receipts.0003` (nullable FK + index); the worker defers while migrations are pending (no upload pause) | pending CTO verification (deployments, migration, health) |
-| #5 Distinguish receipt drafts on Costs (gap 5) | see handoff | see handoff | no | will auto-deploy on merge (view and template only; no migrations) | — |
+| #4 Assign unassigned items to a project (gap 1) + worker migration guard | `c562102` | green (SQLite, PostgreSQL 18) | **yes, `10c8b3a`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `10c8b3a`** (CTO-verified); web log `Applying receipts.0003_draft_context_project… OK` | **verified** (CTO): `/healthz/` HTTP 200 `{"status":"ok"}`; later cron runs processed normally and finished successfully |
+| #5 Distinguish receipt drafts on Costs (gap 5) | `c2af6fd` | green (SQLite, PostgreSQL 18) | **yes, `e99637a`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `e99637a`** (CTO-verified). The web's first deploy timed out after a successful build; the CTO retried the same commit successfully. Root cause not established. | **verified** (CTO): public `/healthz/` HTTP 200 `{"status":"ok"}`; scheduled cron runs succeeded |

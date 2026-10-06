@@ -27,41 +27,53 @@ The command is read-only and prints no names, merchants or file bytes, so its ou
 and no external database access, which keeps the cloud coding environment and the founder's laptop out of
 production data. Route C is not acceptable for "retained data".
 
-## Change route A needs (small, bounded PR if chosen)
+## Tooling for route A (bounded PR, 6 October)
 
-On Render, the only way to run a command is the cron job's command, and the restored instance has its own
-internal URL. Two parts:
-- **Command option:** `restore_fingerprint --database-url-env NAME` reads the connection string from the named
-  environment variable. The URL then never appears in the command text or the logs.
-- **Temporary private variable:** the CTO sets `RESTORE_DATABASE_URL` on the cron job. The cron command is
-  swapped to `python manage.py restore_fingerprint --database-url-env RESTORE_DATABASE_URL` for one run, then
-  restored. The swap follows the same restore-always rules as the failure check.
+`python manage.py restore_fingerprint --database-url-env NAME`:
+- reads the connection string from the named environment variable, so the URL never appears in a command or
+  a log;
+- routes **every query and file check** to that database for the run;
+- runs it **read-only**: PostgreSQL refuses writes in that session;
+- leaves the normal `DATABASE_URL` configuration untouched.
 
-The source fingerprint uses the normal `DATABASE_URL`, taken at a moment with no uploads.
+It refuses, without checking anything, in four cases:
+- the variable is missing or empty;
+- the URL is unsupported or incomplete;
+- it names the source database itself;
+- the database cannot be read. Only the error type is shown; never the URL, user, host or password.
 
-## Drill steps (route A)
+## Drill steps (route A; CTO-corrected 6 October)
 
-1. Agree a quiet time and pause uploads. Wait for an empty queue (proven by the complete `receipt_jobs`
-   table).
-2. Take the source fingerprint: one cron run of `python manage.py restore_fingerprint`. Copy the log.
-3. Start the restore to a new temporary instance. Use the point in time just after step 2, or the latest
-   backup if point-in-time recovery is not offered.
-4. Take the restored fingerprint (the command above), then **restore the normal cron command** and check that
-   a normal run happens.
-5. Compare the two outputs; they must be identical. Record the restore duration and the instance cost.
-6. Delete the temporary instance and the `RESTORE_DATABASE_URL` variable, then resume uploads.
+Nothing below is created or run until the CTO approves the exact temporary-instance quote. Cron command
+changes are made only in an attended session, following the restore-always rules.
+
+1. **Quiet window.** Pause application writes: the owner stops uploads and edits. Prove the complete queue is
+   empty with `python manage.py receipt_jobs --limit 200`: the table is complete (fewer rows than the limit)
+   and has no `queued` or `processing` rows.
+2. **Source fingerprint.** Run one cron command `python manage.py restore_fingerprint`. Copy the log.
+3. **Restore timestamp.** Record an explicit UTC timestamp **inside the write-free window** (after step 2,
+   before writes resume).
+4. **Wait** until that timestamp is eligible under Render's ten-minute recovery restriction.
+5. **Restore to a separate temporary database** at that timestamp. **Never replace or restore over
+   production.**
+6. **Restored fingerprint.**
+   - Set `RESTORE_DATABASE_URL` privately on the cron job, to the temporary instance's internal URL.
+   - Run one cron command `python manage.py restore_fingerprint --database-url-env RESTORE_DATABASE_URL`.
+7. **Restore the normal command** `python manage.py process_receipts --once` and **verify a successful
+   run**. Do this always, including after a failure or interruption.
+8. **Compare.**
+   - The fingerprints must be identical.
+   - Both must show zero `missing_references`, zero `size_mismatches` and zero
+     `receipt_checksum_mismatches`.
+   - Record the restore duration.
+9. **Clean up** within the eventual approval: delete the temporary instance and remove `RESTORE_DATABASE_URL`.
+   Then resume writes.
+
+**Before creating anything:** obtain the **exact temporary-instance quote** from the dashboard for CTO
+review.
 
 **Evidence to record:**
 - both fingerprints (sanitised);
-- timings;
-- the restored point in time;
-- the cost;
-- the confirmation that the temporary instance and variable were deleted.
-
-## Decisions needed (CTO)
-
-1. Route A or B.
-2. For route A:
-   - confirm the plan's backup and point-in-time recovery options on the dashboard;
-   - put the temporary instance's cost to the founder as new spending;
-   - authorise the small `--database-url-env` PR.
+- the restore timestamp and duration;
+- the quote and the actual cost;
+- confirmation of cleanup.

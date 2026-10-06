@@ -159,3 +159,49 @@ def test_missing_or_invalid_configuration_checks_nothing(monkeypatch, value):
     assert "Nothing was checked." in message and "S3cretPW" not in message and "alice" not in message
     assert out.getvalue() == ""  # no fingerprint of the source was printed instead
     assert RESTORE_ALIAS not in connections.settings
+
+
+@pytest.mark.parametrize("url", [
+    "postgres://alice:S3cretPW@db-canary.example:notaport/rbr",   # invalid port
+    "postgres://alice:S3cretPW@db-canary.example:99999/rbr",      # out-of-range port
+    "postgres://alice:S3cretPW@[db-canary.example/rbr",           # malformed bracketed host
+    "postgres://alice:S3cretPW@[::1/rbr",                         # unterminated IPv6 literal
+])
+def test_unparseable_urls_fail_without_revealing_anything(databases, url):
+    env = _env(databases["source"], RESTORE_DATABASE_URL=url)
+    done = _manage(env, "restore_fingerprint", "--database-url-env", "RESTORE_DATABASE_URL")
+    assert done.returncode != 0 and done.stdout == ""  # failed before any fingerprint
+    assert "RESTORE_DATABASE_URL could not be read as a database URL. Nothing was checked." in done.stderr
+    for fragment in ("S3cretPW", "alice", "db-canary", "::1", "99999", "notaport", "postgres://", "Traceback",
+                     "ValueError"):
+        assert fragment not in done.stdout + done.stderr, fragment
+
+
+SQLITE_WRITE = """
+from apps.core.management.commands.restore_fingerprint import _selected_database, _use_database
+from apps.projects.models import Project
+with _use_database(_selected_database("RESTORE_DATABASE_URL")):
+    try:
+        Project.objects.update(title="changed")
+        print("WRITE-ALLOWED")
+    except Exception as exc:
+        print("WRITE-REFUSED", type(exc).__name__)
+"""
+
+
+def test_selected_sqlite_copy_is_read_only(databases, tmp_path):
+    copy = tmp_path / "copy.sqlite3"
+    shutil.copy(databases["restored"], copy)
+    before = copy.read_bytes()
+    done = _manage(_env(databases["source"], RESTORE_DATABASE_URL=f"sqlite:///{copy}"), "shell", "-c", SQLITE_WRITE)
+    assert "WRITE-REFUSED OperationalError" in done.stdout, done.stdout + done.stderr
+    assert copy.read_bytes() == before
+
+
+def test_missing_sqlite_target_is_refused_and_never_created(databases, tmp_path):
+    missing = tmp_path / "nope" / "restored.sqlite3"
+    env = _env(databases["source"], RESTORE_DATABASE_URL=f"sqlite:///{missing}")
+    done = _manage(env, "restore_fingerprint", "--database-url-env", "RESTORE_DATABASE_URL")
+    assert done.returncode != 0 and done.stdout == ""
+    assert "names a SQLite file that does not exist. Nothing was checked." in done.stderr
+    assert not missing.exists() and not missing.parent.exists()

@@ -1,7 +1,7 @@
 # Recovery readiness plan (Milestone 4, due 14 October 2026)
 
-Prepared 6 October 2026. **A CTO decision on the route is needed.** Nothing here has been run against
-production.
+**Status: Route A selected; drill pending quote approval.** Prepared 6 October 2026. Nothing here has been
+run against production.
 
 ## What "recovered" must mean
 
@@ -23,7 +23,7 @@ The command is read-only and prints no names, merchants or file bytes, so its ou
 | B. Logical dump to the founder's laptop | `scripts/render_db.py backup` (pg_dump through a temporary `/32` access rule), then `restore-check` into a local PostgreSQL | A portable off-Render copy can be restored | No Render spend. It needs a temporary external-access rule, a local PostgreSQL on the Mac (Homebrew had to compile it on macOS 14) and about 30–45 minutes of founder time. | High |
 | C. Rely on managed backups untested | — | Nothing | — | — |
 
-**Recommendation: route A.** It tests the recovery path that would really be used. It needs no founder time
+**Selected (CTO, 6 October): route A.** It tests the recovery path that would really be used. It needs no founder time
 and no external database access, which keeps the cloud coding environment and the founder's laptop out of
 production data. Route C is not acceptable for "retained data".
 
@@ -36,9 +36,12 @@ production data. Route C is not acceptable for "retained data".
 - runs it **read-only**: PostgreSQL refuses writes in that session;
 - leaves the normal `DATABASE_URL` configuration untouched.
 
+For local tests a SQLite copy is opened read-only (`mode=ro`) and must already exist; it is never created.
+
 It refuses, without checking anything, in four cases:
 - the variable is missing or empty;
-- the URL is unsupported or incomplete;
+- the URL is unsupported, incomplete or cannot be parsed (invalid port, malformed host). Parser
+  messages are never shown;
 - it names the source database itself;
 - the database cannot be read. Only the error type is shown; never the URL, user, host or password.
 

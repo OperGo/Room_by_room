@@ -22,6 +22,7 @@ import contextlib
 import hashlib
 import json
 import os
+from pathlib import Path
 from urllib.parse import urlparse
 
 from django.apps import apps
@@ -53,30 +54,50 @@ class _OnlyRestoredDatabase:
         return True
 
 
+def _parse_selected(env_name, value):
+    """Parse ``value`` into connection settings. Any parsing problem raises a generic CommandError: parser
+    messages can quote the URL (user, password, host), so they are never shown."""
+    try:
+        parsed = urlparse(value)
+        if parsed.scheme in {"postgres", "postgresql"}:
+            # Reading these validates them: invalid or out-of-range ports and malformed hosts raise ValueError.
+            host, port, name = parsed.hostname, parsed.port, parsed.path.strip("/")
+            if not host or not name:
+                raise CommandError(f"{env_name} must be a PostgreSQL URL with a host and database name. "
+                                   "Nothing was checked.")
+            from config.settings import database_from_url
+
+            config = database_from_url(value)
+            # Read-only at the database level as well: any write in this session is refused by PostgreSQL.
+            config["OPTIONS"] = {"options": "-c default_transaction_read_only=on"}
+            return config, None
+        if parsed.scheme == "sqlite" and parsed.path:
+            return None, Path(parsed.path)
+    except CommandError:
+        raise
+    except (ValueError, TypeError, KeyError, RuntimeError):
+        raise CommandError(f"{env_name} could not be read as a database URL. Nothing was checked.") from None
+    raise CommandError(f"{env_name} is not a supported database URL. Nothing was checked.")
+
+
 def _selected_database(env_name):
     """Connection settings for the database named by ``env_name``. Never echoes the value."""
     value = (os.environ.get(env_name) or "").strip()
     if not value:
         raise CommandError(f"{env_name} is not set or is empty. Nothing was checked.")
-    parsed = urlparse(value)
-    if parsed.scheme in {"postgres", "postgresql"}:
-        if not parsed.hostname or not parsed.path.strip("/"):
-            raise CommandError(f"{env_name} must be a PostgreSQL URL with a host and database name. Nothing was checked.")
-        from config.settings import database_from_url
-
-        config = database_from_url(value)
-        # Read-only at the database level as well: any write in this session is refused by PostgreSQL.
-        config["OPTIONS"] = {"options": "-c default_transaction_read_only=on"}
-    elif parsed.scheme == "sqlite" and parsed.path:
-        config = {"ENGINE": "django.db.backends.sqlite3", "NAME": parsed.path}
-    else:
-        raise CommandError(f"{env_name} is not a supported database URL. Nothing was checked.")
-    config["CONN_MAX_AGE"] = 0
+    config, sqlite_path = _parse_selected(env_name, value)
     source = connections["default"].settings_dict
-    same = (config["ENGINE"] == source["ENGINE"] and str(config["NAME"]) == str(source["NAME"])
-            and config.get("HOST", "") == source.get("HOST", "") and str(config.get("PORT", "")) == str(source.get("PORT", "")))
-    if same:
+    if sqlite_path is not None:
+        # Read-only and never created: the file must already exist, and SQLite opens it with mode=ro.
+        if not sqlite_path.is_file():
+            raise CommandError(f"{env_name} names a SQLite file that does not exist. Nothing was checked.")
+        if source["ENGINE"].endswith("sqlite3") and Path(str(source["NAME"])).resolve() == sqlite_path.resolve():
+            raise CommandError(f"{env_name} names the source database itself. Nothing was checked.")
+        config = {"ENGINE": "django.db.backends.sqlite3", "NAME": f"{sqlite_path.resolve().as_uri()}?mode=ro"}
+    elif (source["ENGINE"] == config["ENGINE"] and str(source["NAME"]) == str(config["NAME"])
+          and source.get("HOST", "") == config.get("HOST", "") and str(source.get("PORT", "")) == str(config.get("PORT", ""))):
         raise CommandError(f"{env_name} names the source database itself. Nothing was checked.")
+    config["CONN_MAX_AGE"] = 0
     return config
 
 

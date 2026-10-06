@@ -57,11 +57,10 @@ Details: `docs/sprints/evidence/milestone-2-receipt-notes.md`; procedures: `docs
 
 | Owner | Action |
 |---|---|
-| CTO | Final review of PR #1's head; authorise the merge; verify both auto-deployments |
 | CTO | Collect `receipt_jobs` via the command swap; record the cron 24-hour cost projection |
 | CTO + founder | Run the controlled auth-failure check (`docs/receipt-runtime-decision.md`): mandatory empty-queue proof, then always restore. The founder taps Read and reports the owner evidence |
 | Founder | Provide R2–R5 samples (mixed documents allowed); check extracted values |
-| CTO | Review the sign-in and form-finish PR (assessment gaps 3 and 4); then the allocation-shortcut PR (gap 1) and the receipt-drafts PR (gap 5), as instructed on 5 October |
+| CTO | Verify PR #4 deployment (`10c8b3a`: web, cron, migration `receipts.0003`, health); review PR #5 (gap 5) |
 | Claude | Consolidated Milestone 2 report once the evidence is in; triage of the founder's Milestone 3 friction log |
 
 ## Product assessment (5 October 2026)
@@ -83,6 +82,6 @@ Details: `docs/assessments/2026-10-05-product-assessment.md`.
 |---|---|---|---|---|---|
 | #1 Operating framework + lean CI | `6934f50` | green (run 3: SQLite, PostgreSQL 18) | **yes, `2765733`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `2765733`** (CTO-verified) | cron: later runs succeeded (CTO-verified); **web health pending** (Render log query timed out) |
 | #2 Milestone 3 plan + ledger update | `935e4d9` | green (SQLite, PostgreSQL 18) | **yes, `6ceefd6`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron at `6ceefd6`** (CTO-verified) | verified by the CTO |
-| #3 Sign-in layout and form finish (gaps 3, 4) + assessment | see handoff | see handoff | no | will auto-deploy on merge (templates, CSS, form labels; no migrations) | — |
-| #4 Assign unassigned items to a project (gap 1) | see handoff | see handoff | no | will auto-deploy on merge; **migration** `receipts.0003` (nullable FK + index) | — |
+| #3 Sign-in layout and form finish (gaps 3, 4) + assessment | `060ac91` | green (SQLite, PostgreSQL 18) | **yes, `b08919d`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `b08919d`** (CTO-verified) | **verified** (CTO): `/healthz/` HTTP 200 `{"status":"ok"}`; later scheduled cron runs succeeded |
+| #4 Assign unassigned items to a project (gap 1) + worker migration guard | `c562102` | green (SQLite, PostgreSQL 18) | **yes, `10c8b3a`** (merge commit, CTO-authorised, head-SHA guarded) | auto-deploy; **migration** `receipts.0003` (nullable FK + index); the worker defers while migrations are pending (no upload pause) | pending CTO verification (deployments, migration, health) |
 | #5 Distinguish receipt drafts on Costs (gap 5) | see handoff | see handoff | no | will auto-deploy on merge (view and template only; no migrations) | — |

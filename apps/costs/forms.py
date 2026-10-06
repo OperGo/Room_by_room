@@ -45,7 +45,7 @@ def resolve_destination(owner, value):
         if project is None:
             raise ValueError("Unknown project.")
         return CostAllocation.Destination.PROJECT, project
-    raise ValueError("Choose where this cost belongs.")
+    raise ValueError(MISSING_DESTINATION)
 
 
 def _indexes(post, prefix):
@@ -71,6 +71,21 @@ def _parse_quantity(value):
     except InvalidOperation:
         return None
     return quantity if quantity.is_finite() else None
+
+
+MISSING_DESTINATION = "Choose where this cost belongs."
+
+
+def owned_project_key(owner, project_uuid):
+    """Return the destination key for one of the owner's projects, or "" for anything else (foreign, unknown,
+    malformed or archived). Used only to pre-select a choice; never trusted for posting."""
+    from apps.core.shortcuts import parse_uuid
+
+    parsed = parse_uuid(project_uuid) if project_uuid else None
+    if parsed is None:
+        return ""
+    project = Project.objects.for_owner(owner).exclude(status=Project.Status.ARCHIVED).filter(uuid=parsed).first()
+    return f"project:{project.uuid}" if project else ""
 
 
 class PurchaseEditor:
@@ -122,6 +137,21 @@ class PurchaseEditor:
             })
         return lines
 
+    def assign_unassigned(self, destination_key):
+        """Give ``destination_key`` to every line whose only allocation has no destination yet.
+
+        Lines that already have a destination, and split lines (more than one allocation row), are never
+        changed. The key is validated against the owner's own destinations. Returns the number of lines
+        changed; raises ValueError for an unknown or foreign destination."""
+        resolve_destination(self.owner, destination_key)
+        changed = 0
+        for line in self.lines:
+            allocations = line.get("allocations") or []
+            if len(allocations) == 1 and not allocations[0].get("dest"):
+                allocations[0]["dest"] = destination_key
+                changed += 1
+        return changed
+
     # ----------------------------------------------------------------- parsing
 
     def is_valid(self):
@@ -138,6 +168,7 @@ class PurchaseEditor:
             except ValueError as exc:
                 errors.append(f"Total: {exc}")
         line_inputs = []
+        missing_destination = []  # reported once, after the loop, instead of one identical error per line
         for i in _indexes(post, "line-"):
             p = f"line-{i}-"
             raw = {
@@ -190,7 +221,10 @@ class PurchaseEditor:
                 try:
                     destination, project = resolve_destination(self.owner, alloc["dest"])
                 except ValueError as exc:
-                    errors.append(f"{name}: {exc}")
+                    if str(exc) == MISSING_DESTINATION:
+                        missing_destination.append(len(self.lines))
+                    else:
+                        errors.append(f"{name}: {exc}")
                     break
                 if single and not alloc["amount"]:
                     alloc_amount = amount
@@ -208,6 +242,11 @@ class PurchaseEditor:
                     line_type=raw["line_type"], category=raw["category"], quantity=quantity,
                     unit_price=unit_price, shopping_item_ids=shopping_ids,
                 ))
+        if missing_destination:
+            numbers = [str(n) for n in missing_destination]
+            listed = numbers[0] if len(numbers) == 1 else ", ".join(numbers[:-1]) + " and " + numbers[-1]
+            errors.append(f"Choose a project for {'item' if len(numbers) == 1 else 'items'} {listed}. "
+                          "Tip: use “Assign unassigned items to” above the items.")
         if not self.lines:
             errors.append("Add at least one line.")
             self.lines = [self.blank_line()]

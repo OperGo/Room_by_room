@@ -239,9 +239,31 @@
       line.querySelector("input[name$='-description']").focus();
     }
 
+    function assignUnassigned(button) {
+      // Fill only lines whose single allocation has no destination; split lines and chosen projects stay.
+      var box = button.closest("[data-bulk-assign]");
+      var dest = box.querySelector("[data-bulk-dest]");
+      var note = box.querySelector("[data-bulk-note]");
+      if (!dest.value) { note.textContent = "Choose a project first."; dest.focus(); return; }
+      var count = 0;
+      linesBox.querySelectorAll("[data-line]").forEach(function (line) {
+        var rows = line.querySelectorAll("[data-alloc]");
+        if (rows.length !== 1) return;
+        var select = rows[0].querySelector("[data-alloc-dest]");
+        if (select.value) return;
+        select.value = dest.value;
+        count += 1;
+      });
+      var name = dest.options[dest.selectedIndex].text;
+      note.textContent = count ? "Assigned " + count + (count === 1 ? " item" : " items") + " to " + name + ". Nothing is recorded until you confirm."
+                               : "Every item already has a project.";
+      if (count) { markDirty(); reconcile(); }
+    }
+
     editor.addEventListener("click", function (event) {
       var target = event.target.closest("button");
       if (!target) return;
+      if (target.hasAttribute("data-bulk-apply")) { event.preventDefault(); assignUnassigned(target); return; }
       if (target.matches("[data-add-line], [data-add-adjustment], [data-remove-line], [data-split], [data-remove-alloc]")) markDirty();
       if (target.hasAttribute("data-add-line")) { addLine(); }
       else if (target.hasAttribute("data-add-adjustment")) { addLine("shipping"); }

@@ -15,8 +15,12 @@ from .models import ReceiptDocument, ReceiptDraft
 EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "image/heic": "heic", "application/pdf": "pdf"}
 
 
-def store_receipt(owner, validated, original_filename=""):
-    """Store an uploaded receipt privately and open an empty draft. Creates no cost."""
+def store_receipt(owner, validated, original_filename="", context_project=None):
+    """Store an uploaded receipt privately and open an empty draft. Creates no cost.
+
+    ``context_project`` (the project the owner started from) is kept only if it belongs to the owner."""
+    if context_project is not None and context_project.owner_id != owner.pk:
+        context_project = None
     storage = private_storage()
     base = f"receipts/{owner.pk}/{uuid.uuid4().hex}"
     key = storage.save(f"{base}.{EXTENSIONS[validated.mime]}", ContentFile(validated.content))
@@ -30,7 +34,8 @@ def store_receipt(owner, validated, original_filename=""):
                 original_filename=(original_filename or "")[-120:], checksum=validated.checksum,
                 mime=validated.mime, size=validated.size, page_count=validated.page_count,
             )
-            draft = ReceiptDraft.objects.create(owner=owner, document=document, data={})
+            draft = ReceiptDraft.objects.create(owner=owner, document=document, data={},
+                                                context_project=context_project)
         return document, draft
     except Exception:
         storage.delete(key)

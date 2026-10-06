@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.core.dates import local_today
@@ -12,8 +13,9 @@ from apps.core.exceptions import BusinessRuleError, StaleObjectError
 from apps.core.shortcuts import flash_errors, owned
 from apps.core.storage import private_storage
 from apps.core.uploads import validate_receipt
-from apps.costs.forms import PurchaseEditor
+from apps.costs.forms import PurchaseEditor, owned_project_key
 from apps.costs.models import Purchase
+from apps.projects.models import Project
 from apps.costs.views import _editor_context, _needs_choices, _overlaps_for
 
 from . import jobs, services
@@ -25,8 +27,15 @@ class ReceiptUploadForm(forms.Form):
     receipt = forms.FileField()
 
 
+def _context_project(owner, value):
+    """The owner's (non-archived) project named by ``?project=``; anything else is ignored."""
+    key = owned_project_key(owner, value)
+    return Project.objects.for_owner(owner).get(uuid=key.split(":", 1)[1]) if key else None
+
+
 def receipt_new(request):
     form = ReceiptUploadForm(request.POST or None, request.FILES or None)
+    context_project = _context_project(request.user, request.POST.get("project") or request.GET.get("project"))
     if request.method == "POST":
         if form.is_valid():
             upload = form.cleaned_data["receipt"]
@@ -35,7 +44,8 @@ def receipt_new(request):
             except ValidationError as exc:
                 form.add_error("receipt", exc)
             else:
-                document, draft = services.store_receipt(request.user, validated, upload.name)
+                document, draft = services.store_receipt(request.user, validated, upload.name,
+                                                         context_project=context_project)
                 messages.success(request, "Receipt saved privately. Review it to record the purchase.")
                 return redirect("receipts:review", uuid=draft.uuid)
         else:
@@ -43,13 +53,20 @@ def receipt_new(request):
             form.add_error("receipt", "Choose a photo or PDF of the receipt.")
     available, message, provider_note = extraction_status()
     return render(request, "receipts/new.html", {"form": form, "extraction_available": available,
-                                                 "extraction_message": message, "provider_note": provider_note})
+                                                 "extraction_message": message, "provider_note": provider_note,
+                                                 "context_project": context_project})
+
+
+def _draft_context_key(draft):
+    """Destination key for the draft's starting project, re-checked against the draft owner."""
+    return owned_project_key(draft.owner, str(draft.context_project.uuid)) if draft.context_project_id else ""
 
 
 def _draft_initial(draft):
     data = draft.data or {}
     initial = {k: data.get(k, "") for k in ("description", "merchant", "transaction_date", "total", "notes")}
     initial["lines"] = data.get("lines") or None
+    initial["default_destination"] = _draft_context_key(draft)  # only for a brand-new blank line
     if not initial["transaction_date"]:
         initial["transaction_date"] = ""
     return initial
@@ -66,6 +83,8 @@ def _review_context(request, draft, editor, **extra):
         duplicates=services.duplicate_documents(draft.document).select_related("draft")[:5],
         extraction_available=available, extraction_message=message, provider_note=provider_note,
         recent_purchases=recent, version=draft.version,
+        bulk_default=(editor.data or {}).get("bulk_dest") or _draft_context_key(draft),
+        assign_action=reverse("receipts:save", args=[draft.uuid]),
         job=job, job_state=jobs.job_state(job), extraction=(draft.data or {}).get("extraction") or {},
         # Any editor rebuilt from a POST (validation errors, overlap choices, GBP or duplicate
         # acknowledgement, stale confirmation, save conflict) holds the owner's unsaved values:
@@ -97,6 +116,13 @@ def receipt_save(request, uuid):
     draft = owned(ReceiptDraft, request.user, uuid=uuid)
     editor = PurchaseEditor(request.user, request.POST)
     editor.is_valid()  # parse for redisplay; drafts may be incomplete
+    assigned = None
+    if request.POST.get("assign_unassigned"):
+        # Without JavaScript the "Assign" button saves the draft with unassigned items filled in.
+        try:
+            assigned = editor.assign_unassigned(request.POST.get("bulk_dest", ""))
+        except ValueError:
+            messages.error(request, "Choose a project to assign the unassigned items to.")
     try:
         services.save_draft(request.user, draft, request.POST.get("version"), _editor_snapshot(editor))
     except StaleObjectError as exc:
@@ -111,7 +137,11 @@ def receipt_save(request, uuid):
     except BusinessRuleError as exc:
         flash_errors(request, exc)
     else:
-        messages.success(request, "Draft saved. It does not count towards any totals until you confirm it.")
+        if assigned is not None:
+            messages.success(request, f"Assigned {assigned} item{'' if assigned == 1 else 's'}. Draft saved; "
+                                      "nothing is recorded until you confirm.")
+        else:
+            messages.success(request, "Draft saved. It does not count towards any totals until you confirm it.")
     return redirect("receipts:review", uuid=uuid)
 
 
@@ -184,7 +214,8 @@ def receipt_discard(request, uuid):
         return redirect("receipts:review", uuid=uuid)
     if request.GET.get("retake"):
         messages.info(request, "Previous photo discarded. Nothing was recorded.")
-        return redirect("receipts:new")
+        key = _draft_context_key(draft)
+        return redirect(reverse("receipts:new") + (f"?project={key.split(':', 1)[1]}" if key else ""))
     messages.success(request, "Draft discarded. The file is kept privately with no cost recorded.")
     return redirect("costs:index")
 

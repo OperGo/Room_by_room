@@ -526,6 +526,10 @@ details.group[open] .when-closed, details.group:not([open]) .when-open { display
 .line-top input { font-weight: 650; }
 .line-top .amount-input { text-align: right; font-variant-numeric: tabular-nums; }
 .lines-stack { display: grid; gap: 10px; }
+.bulk-assign { display: grid; gap: 6px; margin: 0 0 12px; }
+.bulk-assign label { font-weight: 600; }
+.bulk-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.bulk-assign .help { margin: 0; }
 .dest-wrap { position: relative; }
 .dest-wrap .icon { position: absolute; left: 12px; top: 12px; color: var(--muted); pointer-events: none; }
 .dest-wrap select { padding-left: 42px; }

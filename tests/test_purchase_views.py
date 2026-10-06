@@ -58,7 +58,7 @@ def test_invalid_money_input_shows_errors(client_owner, owner, office):
     assert response.status_code == 200
     assert b"two decimal places" in response.content
     response = client_owner.post(reverse("costs:purchase_create"), base(office, **{"line-0-alloc-0-dest": ""}))
-    assert b"Choose where this cost belongs" in response.content
+    assert b"Choose a project for item 1." in response.content  # consolidated missing-destination message
     assert Purchase.objects.count() == 0
 
 

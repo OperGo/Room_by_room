@@ -47,7 +47,8 @@ It refuses, without checking anything, in four cases:
 
 ## Drill steps (route A; CTO-corrected 6 October)
 
-Nothing below is created or run until the CTO approves the exact temporary-instance quote. Cron command
+Nothing below is created or run until the CTO has obtained and recommended the exact temporary-instance quote and
+the founder has approved the new spending. Cron command
 changes are made only in an attended session, following the restore-always rules.
 
 1. **Quiet window.** Pause application writes: the owner stops uploads and edits. Prove the complete queue is
@@ -72,8 +73,8 @@ changes are made only in an attended session, following the restore-always rules
 9. **Clean up** within the eventual approval: delete the temporary instance and remove `RESTORE_DATABASE_URL`.
    Then resume writes.
 
-**Before creating anything:** obtain the **exact temporary-instance quote** from the dashboard for CTO
-review.
+**Before creating anything:** the CTO obtains the **exact temporary-instance quote** from the dashboard and
+recommends it; the founder approves the spending.
 
 **Evidence to record:**
 - both fingerprints (sanitised);

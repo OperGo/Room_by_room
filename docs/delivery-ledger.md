@@ -16,9 +16,9 @@ business direction, samples and product feedback; founder approval is reserved f
 | # | Milestone | Due | State |
 |---|---|---|---|
 | 1 | Runtime and persistence decision | 5 Oct | **Accepted** (cron every minute, paid PG18, free web) |
-| 2 | Five live receipts through accurate confirmed costs | 8 Oct (target missed) | **Incomplete**: R1 done (founder-reported). R2–R5, the production failure check, `receipt_jobs` metadata, API spend and the cron-cost projection are **deferred to the owner session on Saturday 10 October** (CTO decision, 7 Oct) |
-| 3 | Everyday founder use and friction fixes | 11 Oct | **In progress**: product fixes from the assessment (#3–#5 released). The CTO plan of 7 Oct adds three PRs: Home project costs, receipt unsaved-changes warning, reading connection feedback. Founder use and the friction log start with the Saturday session |
-| 4 | Retained-data and deployment readiness, including a recovery check | 14 Oct | **Route A selected**; helper released (`e14a0e3`, verified); drill **held** pending quote approval — incomplete |
+| 2 | Five live receipts through accurate confirmed costs | **Sat 10 Oct** (rescheduled from 8 Oct by the CTO on 7 Oct) | **Incomplete**: R1 done (founder-reported). R2–R5, the production failure check, `receipt_jobs` metadata, API spend and the cron-cost projection are scheduled for the owner session on Saturday 10 October |
+| 3 | Everyday founder use and friction fixes | 11–13 Oct | **In progress**: product fixes from the assessment (#3–#5 released). CTO plan of 7 Oct: Home project costs (#7) and receipt unsaved-changes warning (#8) merged, production verification pending (CTO); reading connection feedback (#9) in revision after CTO review. Founder use and the friction log start with the Saturday session; everyday-use observation continues through 11–13 October |
+| 4 | Retained-data and deployment readiness, including a recovery check | 14 Oct | **Route A selected**; helper released (`e14a0e3`, verified); drill **held** until the CTO obtains and recommends the temporary-instance quote and the founder approves the new spending — incomplete |
 | 5 | Final validation and founder go-live | 16 Oct | Not started |
 
 ## Current production state
@@ -26,6 +26,7 @@ business direction, samples and product feedback; founder approval is reserved f
 | Item | Evidence | Source |
 |---|---|---|
 | Web (free) and cron job live at `e14a0e3` (PR #6); migration `receipts.0003` applied (PR #4) | verified | production (CTO-verified, 6 Oct) |
+| `sprint-2a` at `30b7d44` (#7, #8 merged 7 Oct; no migrations); Auto-Deploy expected to deploy web and cron | **not yet verified** | pending CTO verification |
 | Auto-Deploy **on** for both services | **Kept On by CTO decision**: reviewed merges into `sprint-2a` deploy both; the CTO verifies afterwards | production (CTO-observed) |
 | "mac temp" database access rule | **Removed by the founder; external access verified closed** | founder action; production (CTO-verified, 5 Oct) |
 | PostgreSQL 18 paid `0.1c-256mb`; cron `* * * * *` Starter; API key on both services | as applied | founder-reported (4 Oct) |
@@ -58,7 +59,9 @@ Details: `docs/sprints/evidence/milestone-2-receipt-notes.md`; procedures: `docs
 | Owner | Action |
 |---|---|
 | Founder | Provide R2–R5 samples (mixed documents allowed); check extracted values |
-| CTO | Obtain and approve the exact temporary-instance quote before any recovery drill (drill **held** until then) |
+| CTO | Obtain the exact temporary-instance quote and recommend it to the founder (drill **held** until then) |
+| Founder | Approve or decline the recovery quote (new spending), as recommended by the CTO |
+| CTO | Verify web, cron and health at `30b7d44` (#7, #8) |
 | CTO + founder | Run the consolidated owner test session (`docs/owner-test-session.md`): R2–R5, failure check, metadata, spend, cron cost |
 | Claude | Consolidated Milestone 2 report once the evidence is in (structure: `docs/sprints/milestone-2-report-draft.md`); triage of the founder's Milestone 3 friction log; prepare the chosen recovery check |
 
@@ -85,3 +88,5 @@ Details: `docs/assessments/2026-10-05-product-assessment.md`.
 | #4 Assign unassigned items to a project (gap 1) + worker migration guard | `c562102` | green (SQLite, PostgreSQL 18) | **yes, `10c8b3a`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `10c8b3a`** (CTO-verified); web log `Applying receipts.0003_draft_context_project… OK` | **verified** (CTO): `/healthz/` HTTP 200 `{"status":"ok"}`; later cron runs processed normally and finished successfully |
 | #5 Distinguish receipt drafts on Costs (gap 5) | `c2af6fd` | green (SQLite, PostgreSQL 18) | **yes, `e99637a`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `e99637a`** (CTO-verified). The web's first deploy timed out after a successful build; the CTO retried the same commit successfully. Root cause not established. | **verified** (CTO): public `/healthz/` HTTP 200 `{"status":"ok"}`; scheduled cron runs succeeded |
 | #6 Recovery helper `restore_fingerprint --database-url-env`; owner test session; ledger | `e58568d` | green (SQLite, PostgreSQL 18) | **yes, `e14a0e3`** (merge commit, CTO-authorised, head-SHA guarded) | **web and cron live at `e14a0e3`** (CTO-verified) | **verified** (CTO): public health `{"status":"ok"}`; the next scheduled cron run succeeded. Recovery drill **held** pending quote approval |
+| #7 Home project financial visibility; ledger; Saturday checklist | `a6c7292` | green (SQLite, PostgreSQL 18) | **yes, `0a339c3`** (merge commit, CTO-authorised, head-SHA guarded) | Auto-Deploy; pending CTO verification | **pending** (CTO); founder check 11 not run |
+| #8 Receipt-review unsaved-changes indicator and leave warning | `54f5e92` | green (SQLite, PostgreSQL 18) | **yes, `30b7d44`** (merge commit, CTO-authorised, head-SHA guarded) | Auto-Deploy; pending CTO verification | **pending** (CTO); founder check 12 not run |

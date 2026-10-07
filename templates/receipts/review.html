@@ -5,20 +5,21 @@
 <header class="page-head">
   <h1 class="page-title">Review receipt</h1>
   <p class="subtitle">Check the details before confirming.</p>
-  <p class="review-status"><span class="badge badge-draft badge-dot">Draft · not confirmed</span></p>
+  <p class="review-status"><span class="badge badge-draft badge-dot">Draft · not confirmed</span><span class="badge badge-unsaved" data-unsaved-indicator hidden>{% icon "pencil" 14 %}Unsaved changes</span></p>
+  <p class="visually-hidden" role="status" data-unsaved-live></p>
 </header>
 {% if save_conflict %}
 <div class="alert alert-warning" role="alert" id="save-conflict" tabindex="-1">{% icon "triangle-alert" 18 %}<div>
   {% if save_conflict_reason %}<strong>Not saved yet.</strong> {{ save_conflict_reason }}
   {% else %}<strong>Not saved yet: this draft changed since you opened it</strong>{% endif %}{% if job_state.status == "succeeded" and job_state.result_state == "applied" %} (the automatic reading finished and was stored){% endif %}.
-  Everything you entered is still shown below. Press <strong>Save draft</strong> again to keep your version, or <a href="{% url 'receipts:review' draft.uuid %}">reload the stored draft</a> to discard your changes.
+  Everything you entered is still shown below. Press <strong>Save draft</strong> again to keep your version, or <a href="{% url 'receipts:review' draft.uuid %}" data-leave-message="Reload the stored draft? This discards the changes shown here.">reload the stored draft</a> to discard your changes.
 </div></div>
 {% endif %}
 {% include "receipts/_reading.html" %}
 {% if duplicates %}<div class="alert alert-warning">{% icon "triangle-alert" 18 %}<div>This exact file was uploaded before{% for d in duplicates %}{% if d.draft %} (<a href="{% url 'receipts:review' d.draft.uuid %}">{{ d.created_at|date:"j M Y" }}</a>, {{ d.draft.get_review_status_display|lower }}){% endif %}{% endfor %}. Check you are not recording it twice.</div></div>{% endif %}
 {% include "includes/purchase_editor_alerts.html" %}
 
-<form method="post" action="{% url 'receipts:confirm' draft.uuid %}" class="review-grid" data-editor-form {% if editor_submitted %}data-dirty-on-load{% endif %}>{% csrf_token %}
+<form method="post" action="{% url 'receipts:confirm' draft.uuid %}" class="review-grid" data-editor-form data-warn-unsaved {% if editor_submitted %}data-dirty-on-load{% endif %}>{% csrf_token %}
   <input type="hidden" name="version" value="{{ version }}">
   <section class="ev" aria-label="Original receipt">
     <a class="ev-thumb" href="{% url 'receipts:file' document.uuid %}" target="_blank" rel="noopener" aria-label="Open the original receipt">
@@ -60,7 +61,7 @@
       <button class="text-btn" type="submit" formaction="{% url 'receipts:discard' draft.uuid %}?retake=1" formnovalidate data-confirm="Discard this photo and take a new one? Nothing has been recorded.">Retake photo</button>
       <button class="btn btn-wide" type="submit" data-submit-once>Confirm purchase</button>
     </div>
-    <p style="margin-top:4px"><button class="{% if save_conflict %}btn btn-sm{% else %}btn btn-ghost btn-sm{% endif %}" type="submit" formaction="{% url 'receipts:save' draft.uuid %}" formnovalidate data-save-draft>{% if save_conflict %}Save draft (keep my version){% else %}Save draft for later{% endif %}</button></p>
+    <p style="margin-top:4px"><button class="{% if save_conflict %}btn btn-sm{% else %}btn btn-ghost btn-sm{% endif %}" type="submit" formaction="{% url 'receipts:save' draft.uuid %}" formnovalidate data-save-draft>{% if save_conflict %}Save draft (keep my version){% else %}Save draft for later{% endif %}</button><span class="unsaved-note-inline" data-unsaved-indicator hidden>Unsaved changes</span></p>
   </div>
 </form>
 

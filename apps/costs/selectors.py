@@ -47,6 +47,11 @@ class ProjectCostSummary:
         return self.budget is not None and self.net > self.budget
 
     @property
+    def over_by(self):
+        """How far net cost exceeds the budget (None when there is no budget or it is not exceeded)."""
+        return self.net - self.budget if self.over_budget else None
+
+    @property
     def budget_percent(self):
         if not self.budget:
             return None
@@ -63,20 +68,31 @@ def project_cost_summary(project):
     )
 
 
-def project_net_costs(owner, projects):
-    """Net cost per project id for a list of projects, in three queries."""
-    ids = [p.pk for p in projects]
-    result = {pk: ZERO for pk in ids}
+def project_cost_summaries(owner, projects):
+    """``ProjectCostSummary`` per project id for a list of the owner's projects, in two queries.
+
+    Same rules as ``project_cost_summary``: opening balances plus confirmed purchase allocations minus
+    confirmed refund allocations. Drafts never count."""
+    opening = {p.pk: ZERO for p in projects}
+    purchases = dict(opening)
+    refunds = dict(opening)
+    ids = list(opening)
     for row in OpeningCostBalance.objects.filter(project_id__in=ids).values("project_id").annotate(t=Sum("amount")):
-        result[row["project_id"]] += row["t"] or ZERO
+        opening[row["project_id"]] += row["t"] or ZERO
     rows = (
         _confirmed_allocations(owner).filter(project_id__in=ids)
         .values("project_id", "line__purchase__kind").annotate(t=Sum("amount"))
     )
     for row in rows:
-        sign = -1 if row["line__purchase__kind"] == Purchase.Kind.REFUND else 1
-        result[row["project_id"]] += sign * (row["t"] or ZERO)
-    return result
+        target = refunds if row["line__purchase__kind"] == Purchase.Kind.REFUND else purchases
+        target[row["project_id"]] += row["t"] or ZERO
+    return {p.pk: ProjectCostSummary(opening=opening[p.pk], purchases=purchases[p.pk], refunds=refunds[p.pk],
+                                     budget=p.budget) for p in projects}
+
+
+def project_net_costs(owner, projects):
+    """Net cost per project id for a list of projects (see ``project_cost_summaries``)."""
+    return {pk: summary.net for pk, summary in project_cost_summaries(owner, projects).items()}
 
 
 @dataclass

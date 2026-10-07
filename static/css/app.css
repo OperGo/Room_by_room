@@ -64,6 +64,13 @@ p { margin: 0 0 12px; }
 .skip-link:focus { top: 12px; }
 :focus-visible { outline: 3px solid #4E8A73; outline-offset: 2px; border-radius: 6px; }
 .num, .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Home project cards: recorded cost and budget position */
+.money-meta { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+.money-meta strong { color: var(--text); font-weight: 650; }
+.money-meta .mm-note { font-size: 13px; }
+.money-meta .mm-over { color: var(--error); }
+.money-meta .mm-over .icon { vertical-align: -3px; margin-right: 3px; }
+.money-meta .mm-over strong { color: var(--error); }
 .muted { color: var(--muted); }
 .small { font-size: 14px; }
 .tiny { font-size: 13px; }
@@ -551,6 +558,10 @@ details.line-more[open] > summary .icon { transform: rotate(180deg); }
 .section-h { font-size: 24px; font-weight: 750; letter-spacing: -0.015em; margin: 6px 0 12px; }
 
 @media (min-width: 768px) {
+  /* Tablet: the Home column is narrow, so keep the photo modest and leave room for progress and costs. */
+  .proj-card { grid-template-columns: 132px 1fr; }
+}
+@media (min-width: 1024px) {
   .proj-card { grid-template-columns: 200px 1fr; }
 }
 @media (min-width: 1024px) {
@@ -580,6 +591,9 @@ details.line-more > summary, details.disclosure > summary { min-height: var(--ta
 }
 .review-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 10px 0 0; }
 .review-status .small { flex: 1 1 200px; }
+.badge-unsaved { background: var(--card); color: var(--ochre); border: 1px solid var(--ochre); }
+.unsaved-note-inline { margin-left: 10px; font-size: 13.5px; font-weight: 600; color: var(--ochre); }
+.badge-unsaved[hidden], .unsaved-note-inline[hidden] { display: none; }
 .ev-thumb img { max-height: 260px; }
 @media (max-width: 599.98px) {
   .alloc-row:not(.single) { grid-template-columns: 1fr var(--tap); }

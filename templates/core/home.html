@@ -25,6 +25,7 @@
         <div class="hero-body">
           <div class="title-row"><h2>{{ featured.title }}</h2>{% icon "chevron-right" 24 %}</div>
           {% include "includes/progress_meta.html" with progress=featured.progress %}
+          {% include "includes/project_money.html" with costs=featured.costs %}
         </div>
       </a>
     </article>
@@ -34,6 +35,7 @@
       <span class="pc-body">
         <span class="title-row"><h3>{{ p.title }}</h3>{% icon "chevron-right" 22 %}</span>
         {% include "includes/progress_meta.html" with progress=p.progress %}
+        {% include "includes/project_money.html" with costs=p.costs %}
       </span>
     </a>
     {% endfor %}

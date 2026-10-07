@@ -1,0 +1,7 @@
+{% load rbr %}{# Home project cards: confirmed records and opening estimates only (drafts never count). #}
+<p class="money-meta{% if costs.over_budget %} is-over{% endif %}">
+  <span class="mm-spent"><span class="mm-label">Recorded</span> <strong class="money">{{ costs.net|gbp }}</strong>{% if costs.opening %} <span class="mm-note">incl. {{ costs.opening|gbp }} estimate</span>{% endif %}</span>
+  {% if costs.budget is None %}<span class="mm-budget mm-none">No budget set</span>
+  {% elif costs.over_budget %}<span class="mm-budget mm-over">{% icon "triangle-alert" 16 %}<strong class="money">{{ costs.over_by|gbp }}</strong> over the {{ costs.budget|gbp }} budget</span>
+  {% else %}<span class="mm-budget"><strong class="money">{{ costs.budget_remaining|gbp }}</strong> left of {{ costs.budget|gbp }} budget</span>{% endif %}
+</p>

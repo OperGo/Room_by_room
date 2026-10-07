@@ -591,6 +591,9 @@ details.line-more > summary, details.disclosure > summary { min-height: var(--ta
 }
 .review-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 10px 0 0; }
 .review-status .small { flex: 1 1 200px; }
+.badge-unsaved { background: var(--card); color: var(--ochre); border: 1px solid var(--ochre); }
+.unsaved-note-inline { margin-left: 10px; font-size: 13.5px; font-weight: 600; color: var(--ochre); }
+.badge-unsaved[hidden], .unsaved-note-inline[hidden] { display: none; }
 .ev-thumb img { max-height: 260px; }
 @media (max-width: 599.98px) {
   .alloc-row:not(.single) { grid-template-columns: 1fr var(--tap); }

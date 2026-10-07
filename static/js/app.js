@@ -29,6 +29,12 @@
       event.preventDefault();
       return;
     }
+    if (form.hasAttribute("data-leaves-page") && warnUnsaved && formDirty && !leaveAllowed && !window.confirm(LEAVE_MESSAGE)) {
+      event.preventDefault();  // e.g. signing out from a receipt with unsaved edits
+      return;
+    }
+    leaveAllowed = true;  // Save, Confirm and other submissions never trigger the leave warning
+
     // Prevent double taps; the server is idempotent as well.
     var submitter = event.submitter;
     if (submitter && submitter.hasAttribute("data-submit-once")) {
@@ -70,7 +76,40 @@
 
   // Track unsaved changes (typing, structural edits, programmatic fills) so nothing discards them.
   var formDirty = false;
-  function markDirty() { formDirty = true; }
+  // Receipt review: show "Unsaved changes" and warn before leaving. Nothing is stored in the browser.
+  var warnUnsaved = !!document.querySelector("form[data-warn-unsaved]");
+  var leaveAllowed = false;  // set by a form submission (Save, Confirm…) or an accepted leave prompt
+  var LEAVE_MESSAGE = "Leave this receipt? Your unsaved changes will be lost. To keep them, stay and press Save draft.";
+  function onBeforeUnload(event) {
+    if (!formDirty || leaveAllowed) return;
+    event.preventDefault();
+    event.returnValue = "";  // best effort: browsers show their own wording, and iOS may not ask at all
+  }
+  function markDirty() {
+    if (formDirty) return;
+    formDirty = true;
+    if (!warnUnsaved) return;
+    document.querySelectorAll("[data-unsaved-indicator]").forEach(function (el) { el.hidden = false; });
+    var live = document.querySelector("[data-unsaved-live]");
+    if (live) live.textContent = "Unsaved changes. Press Save draft to keep them.";
+    window.addEventListener("beforeunload", onBeforeUnload);
+  }
+  if (warnUnsaved) {
+    // In-app links warn on every browser (beforeunload alone is unreliable on iPhone).
+    document.addEventListener("click", function (event) {
+      if (!formDirty || leaveAllowed || event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      var link = event.target.closest("a[href]");
+      if (!link || link.target === "_blank" || link.hasAttribute("download")) return;
+      var url = new URL(link.href, window.location.href);
+      if (url.hash && url.origin === window.location.origin && url.pathname === window.location.pathname
+          && url.search === window.location.search) return;  // in-page anchor
+      if (window.confirm(link.getAttribute("data-leave-message") || LEAVE_MESSAGE)) leaveAllowed = true;
+      else event.preventDefault();
+    });
+    // A page restored from the back/forward cache after a submission still holds its edits.
+    window.addEventListener("pageshow", function () { leaveAllowed = false; });
+  }
   document.querySelectorAll("form[data-editor-form]").forEach(function (form) {
     if (form.hasAttribute("data-dirty-on-load")) markDirty();  // any editor returned from a POST
     form.addEventListener("input", markDirty);
@@ -122,6 +161,7 @@
     link.addEventListener("click", function (event) {
       event.preventDefault();
       if (formDirty && !window.confirm("Show the stored reading? This reloads the page and replaces the changes you made here. To keep your changes, press Save draft instead.")) return;
+      leaveAllowed = true;  // already confirmed above; no second prompt
       window.location.reload();
     });
   });

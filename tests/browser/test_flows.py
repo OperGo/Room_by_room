@@ -601,3 +601,39 @@ def test_desktop_assign_keeps_chosen_and_split_lines(desktop, live_server, owner
     assert page.input_value("#l0-a0-dest") == f"project:{hallway.uuid}"
     assert page.input_value("#l1-a0-dest") == "" and page.input_value("#l1-a1-dest") == ""  # split untouched
     assert page.input_value("#l2-a0-dest") == f"project:{office.uuid}"
+
+
+# ------------------------------------------------------------------ Home project costs (CTO plan, 7 October)
+
+
+@pytest.mark.parametrize("label", ["390", "768", "1440"])
+def test_home_cards_show_costs_without_overflow(browser, live_server, owner, label):
+    import datetime
+
+    from apps.costs import services
+    from apps.costs.services import AllocationInput, LineInput, PurchaseInput
+
+    office = Project.objects.create(owner=owner, title="Office", budget=Decimal("1200.00"), status=Project.Status.ACTIVE)
+    shed = Project.objects.create(owner=owner, title="A very long garden shed shelving project title",
+                                  budget=Decimal("100.00"), status=Project.Status.ACTIVE)
+    Project.objects.create(owner=owner, title="Hallway", status=Project.Status.PLANNED)
+    services.post_purchase(owner, PurchaseInput(description="Mixed", merchant="Shop",
+                                                transaction_date=datetime.date(2026, 9, 20),
+                                                total=Decimal("1265.60"), lines=[
+        LineInput("Cabinets", Decimal("1115.60"), [AllocationInput("project", Decimal("1115.60"), office)]),
+        LineInput("Timber", Decimal("150.00"), [AllocationInput("project", Decimal("150.00"), shed)])]))
+    context = browser.new_context(**VIEWPORTS[label])
+    page = context.new_page()
+    sign_in(page, live_server)
+    expect(page.get_by_text("£84.40 left of £1,200.00 budget")).to_be_visible()
+    over = page.get_by_text("over the £100.00 budget")
+    expect(over).to_be_visible()
+    assert "£50.00" in over.inner_text()
+    expect(page.get_by_text("No budget set")).to_be_visible()
+    colour = over.evaluate("el => getComputedStyle(el).color")
+    assert colour == page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--error').trim()") \
+        or colour.startswith("rgb(163, 53, 42")  # --error #A3352A
+    assert no_horizontal_scroll(page)
+    page.get_by_text("£84.40 left of £1,200.00 budget").click()  # the card still navigates to the project
+    page.wait_for_url(f"**/projects/{office.uuid}/")
+    context.close()

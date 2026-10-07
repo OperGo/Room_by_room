@@ -88,35 +88,63 @@
     var stale = panel.querySelector("[data-reading-stale]");
     var done = panel.querySelector("[data-reading-done]");
     var dirtyNote = panel.querySelector("[data-reading-dirty]");
+    var connection = panel.querySelector("[data-reading-connection]");
+    // Connection trouble is never an extraction result: keep polling, never reload, never touch values.
+    var failures = 0, timer = null, stopped = false;
+    function schedule(ms) { window.clearTimeout(timer); timer = window.setTimeout(tick, ms); }
+    function connectionLost() {
+      failures += 1;
+      if (failures >= 3 && connection) {
+        connection.textContent = "Connection problem: can’t check the reading right now. Still trying. " +
+          "What you’ve entered here stays on this page, and nothing is recorded.";
+      }
+      schedule(Math.min(5000 * Math.pow(2, failures - 1), 30000));  // 5, 10, 20, then every 30 s
+    }
+    function connectionBack() {
+      failures = 0;
+      if (connection) connection.textContent = "";
+    }
+    window.addEventListener("online", function () { if (failures && !stopped) schedule(0); });
+    function fetchStatus() {
+      var controller = window.AbortController ? new AbortController() : null;
+      var abort = controller && window.setTimeout(function () { controller.abort(); }, 15000);
+      return fetch(url, { headers: { "Accept": "application/json" }, credentials: "same-origin", cache: "no-store",
+                          signal: controller ? controller.signal : undefined })
+        .then(function (r) {
+          window.clearTimeout(abort);
+          var json = (r.headers.get("Content-Type") || "").indexOf("application/json") === 0;
+          if (!r.ok || !json) throw new Error("status unavailable");  // includes a sign-in redirect
+          return r.json();
+        }, function (error) { window.clearTimeout(abort); throw error; });
+    }
     function tick() {
       if (Date.now() - started > 10 * 60 * 1000) {
+        stopped = true;
         if (label) label.textContent = "Still not finished. Refresh later, or enter the details yourself.";
         return;
       }
-      fetch(url, { headers: { "Accept": "application/json" }, credentials: "same-origin", cache: "no-store" })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (state) {
-          if (!state) { window.setTimeout(tick, 5000); return; }
-          if (state.status === "queued" || state.status === "processing") {
-            if (label) label.textContent = state.status === "queued" ? "Waiting to read the receipt…" : "Reading the receipt…";
-            if (attempt) attempt.textContent = state.attempts ? "Attempt " + state.attempts + " of " + state.max_attempts + "." : "";
-            if (stale) stale.hidden = !state.stale_queue;
-            window.setTimeout(tick, 3000);
-            return;
-          }
-          if (!formDirty) { window.location.reload(); return; }
-          if (label) label.textContent = state.status === "failed" ? "Reading failed." : "Reading finished.";
-          var spinner = panel.querySelector("[data-reading-spinner]");
-          if (spinner) spinner.hidden = true;
-          var progressNote = panel.querySelector("[data-reading-progress-note]");
-          if (progressNote) progressNote.hidden = true;
-          if (attempt) attempt.textContent = "";
-          if (done) done.hidden = false;
-          if (dirtyNote) dirtyNote.hidden = false;
-        })
-        .catch(function () { window.setTimeout(tick, 5000); });
+      fetchStatus().then(function (state) {
+        connectionBack();
+        if (state.status === "queued" || state.status === "processing") {
+          if (label) label.textContent = state.status === "queued" ? "Waiting to read the receipt…" : "Reading the receipt…";
+          if (attempt) attempt.textContent = state.attempts ? "Attempt " + state.attempts + " of " + state.max_attempts + "." : "";
+          if (stale) stale.hidden = !state.stale_queue;
+          schedule(3000);
+          return;
+        }
+        stopped = true;
+        if (!formDirty) { window.location.reload(); return; }
+        if (label) label.textContent = state.status === "failed" ? "Reading failed." : "Reading finished.";
+        var spinner = panel.querySelector("[data-reading-spinner]");
+        if (spinner) spinner.hidden = true;
+        var progressNote = panel.querySelector("[data-reading-progress-note]");
+        if (progressNote) progressNote.hidden = true;
+        if (attempt) attempt.textContent = "";
+        if (done) done.hidden = false;
+        if (dirtyNote) dirtyNote.hidden = false;
+      }, connectionLost);
     }
-    window.setTimeout(tick, 2000);
+    schedule(2000);
   });
   document.querySelectorAll("[data-reading-reload]").forEach(function (link) {
     link.addEventListener("click", function (event) {

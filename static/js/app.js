@@ -127,35 +127,94 @@
     var stale = panel.querySelector("[data-reading-stale]");
     var done = panel.querySelector("[data-reading-done]");
     var dirtyNote = panel.querySelector("[data-reading-dirty]");
-    function tick() {
-      if (Date.now() - started > 10 * 60 * 1000) {
-        if (label) label.textContent = "Still not finished. Refresh later, or enter the details yourself.";
+    var connection = panel.querySelector("[data-reading-connection]");
+    var spinner = panel.querySelector("[data-reading-spinner]");
+    // Connection trouble is never an extraction result: keep polling, never reload, never touch values.
+    // One status request at a time; a late response after polling stops is ignored.
+    var failures = 0, timer = null, stopped = false, inFlight = false;
+    var KNOWN = { queued: true, processing: true, succeeded: true, failed: true };
+    function schedule(ms) {
+      if (stopped) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(tick, ms);
+    }
+    function connectionLost() {
+      failures += 1;
+      if (failures >= 3 && connection) {
+        connection.textContent = "Connection problem: can’t check the reading right now. Still trying. " +
+          "What you’ve entered here stays on this page, and nothing is recorded.";
+      }
+      schedule(Math.min(5000 * Math.pow(2, failures - 1), 30000));  // 5, 10, 20, then every 30 s
+    }
+    function stopPolling() {
+      stopped = true;
+      window.clearTimeout(timer);
+      if (spinner) spinner.hidden = true;
+      if (label) label.textContent = "Still not finished. Refresh later, or enter the details yourself.";
+      if (connection && connection.textContent) {
+        connection.textContent = "Connection problem: stopped checking the reading. Refresh the page later to check again. " +
+          "What you’ve entered here stays on this page, and nothing is recorded.";
+      }
+    }
+    window.addEventListener("online", function () { if (failures && !stopped && !inFlight) schedule(0); });
+    function fetchStatus() {
+      // One 15 s deadline covers the request, the response body and JSON parsing; the payload must be a known state.
+      return new Promise(function (resolve, reject) {
+        var controller = window.AbortController ? new AbortController() : null;
+        var deadline = window.setTimeout(function () {
+          if (controller) controller.abort();
+          reject(new Error("status check timed out"));
+        }, 15000);
+        fetch(url, { headers: { "Accept": "application/json" }, credentials: "same-origin", cache: "no-store",
+                     signal: controller ? controller.signal : undefined })
+          .then(function (r) {
+            var json = (r.headers.get("Content-Type") || "").indexOf("application/json") === 0;
+            if (!r.ok || !json) throw new Error("status unavailable");  // includes a sign-in redirect
+            return r.json();
+          })
+          .then(function (state) {
+            if (!state || typeof state !== "object" || !KNOWN.hasOwnProperty(state.status)) throw new Error("invalid status");
+            return state;
+          })
+          .then(function (state) { window.clearTimeout(deadline); resolve(state); },
+                function (error) { window.clearTimeout(deadline); reject(error); });
+      });
+    }
+    function showState(state) {
+      if (state.status === "queued" || state.status === "processing") {
+        if (label) label.textContent = state.status === "queued" ? "Waiting to read the receipt…" : "Reading the receipt…";
+        if (attempt) attempt.textContent = state.attempts ? "Attempt " + state.attempts + " of " + state.max_attempts + "." : "";
+        if (stale) stale.hidden = !state.stale_queue;
+        failures = 0;
+        if (connection) connection.textContent = "";
+        schedule(3000);
         return;
       }
-      fetch(url, { headers: { "Accept": "application/json" }, credentials: "same-origin", cache: "no-store" })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (state) {
-          if (!state) { window.setTimeout(tick, 5000); return; }
-          if (state.status === "queued" || state.status === "processing") {
-            if (label) label.textContent = state.status === "queued" ? "Waiting to read the receipt…" : "Reading the receipt…";
-            if (attempt) attempt.textContent = state.attempts ? "Attempt " + state.attempts + " of " + state.max_attempts + "." : "";
-            if (stale) stale.hidden = !state.stale_queue;
-            window.setTimeout(tick, 3000);
-            return;
-          }
-          if (!formDirty) { window.location.reload(); return; }
-          if (label) label.textContent = state.status === "failed" ? "Reading failed." : "Reading finished.";
-          var spinner = panel.querySelector("[data-reading-spinner]");
-          if (spinner) spinner.hidden = true;
-          var progressNote = panel.querySelector("[data-reading-progress-note]");
-          if (progressNote) progressNote.hidden = true;
-          if (attempt) attempt.textContent = "";
-          if (done) done.hidden = false;
-          if (dirtyNote) dirtyNote.hidden = false;
-        })
-        .catch(function () { window.setTimeout(tick, 5000); });
+      stopped = true;
+      if (connection) connection.textContent = "";
+      if (!formDirty) { window.location.reload(); return; }
+      if (label) label.textContent = state.status === "failed" ? "Reading failed." : "Reading finished.";
+      if (spinner) spinner.hidden = true;
+      var progressNote = panel.querySelector("[data-reading-progress-note]");
+      if (progressNote) progressNote.hidden = true;
+      if (attempt) attempt.textContent = "";
+      if (done) done.hidden = false;
+      if (dirtyNote) dirtyNote.hidden = false;
     }
-    window.setTimeout(tick, 2000);
+    function tick() {
+      if (stopped || inFlight) return;  // the request in flight schedules the next check itself
+      if (Date.now() - started > 10 * 60 * 1000) { stopPolling(); return; }
+      inFlight = true;
+      fetchStatus().then(function (state) {
+        inFlight = false;
+        if (stopped) return;
+        try { showState(state); } catch (error) { if (!stopped) connectionLost(); }  // never restarts after a result
+      }, function () {
+        inFlight = false;
+        if (!stopped) connectionLost();
+      });
+    }
+    schedule(2000);
   });
   document.querySelectorAll("[data-reading-reload]").forEach(function (link) {
     link.addEventListener("click", function (event) {

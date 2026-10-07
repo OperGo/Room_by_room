@@ -69,6 +69,9 @@ start: …` and `Processed …`.
 These come after step 9, when the normal command is restored and uploads have resumed. Mark any check whose
 release is not live as **not run**. It must not be recorded as passed.
 
+**Status: checks 11–13 are not run** until they are performed in the session. Merging or deploying a PR does not
+count as a pass.
+
 11. **Home project costs** (PR "Home project financial visibility").
     - On Home, each project card shows **Recorded £…** and, where a budget is set, **£… left of £… budget**
       or **£… over the £… budget**. A project without a budget says **No budget set**.

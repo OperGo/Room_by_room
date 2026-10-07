@@ -9,6 +9,7 @@
       <span class="small" data-reading-attempt>{% if job_state.attempts %}Attempt {{ job_state.attempts }} of {{ job_state.max_attempts }}.{% endif %}</span>
       <p class="small" style="margin:4px 0 0" data-reading-progress-note>You can keep editing or enter the details yourself. Nothing is recorded until you confirm.</p>
       <p class="small" data-reading-stale {% if not job_state.stale_queue %}hidden{% endif %} style="margin:4px 0 0"><strong>Still waiting.</strong> Readings normally start within 1–2 minutes. If nothing changes soon, enter the details yourself or try again later.</p>
+      <p class="small reading-connection" data-reading-connection></p>
       <p class="small" data-reading-done hidden style="margin:4px 0 0">Your changes on this page have been kept.
         <span data-reading-dirty hidden>To keep them, press <strong>Save draft</strong> (you'll be asked to confirm because the draft changed). Or <a href="" data-reading-reload>show the stored reading instead (replaces your changes)</a>.</span></p>
     </div>

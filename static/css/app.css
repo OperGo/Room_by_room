@@ -604,6 +604,8 @@ details.line-more > summary, details.disclosure > summary { min-height: var(--ta
 /* ================================================================== Sprint 2: reading states */
 .reading-panel { margin: 0 0 14px; }
 .reading-panel .alert { margin-bottom: 0; }
+.reading-connection { margin: 6px 0 0; font-weight: 600; color: #6B4C0E; }
+.reading-connection:empty { display: none; }
 .reading-offer { display: grid; gap: 4px; }
 .reading-offer .btn { width: 100%; }
 .spinner { width: 18px; height: 18px; flex: none; border-radius: 999px; border: 2.5px solid var(--sage-strong); border-top-color: var(--primary); animation: spin 0.9s linear infinite; margin-top: 2px; }

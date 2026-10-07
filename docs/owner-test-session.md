@@ -1,4 +1,4 @@
-# Consolidated owner test session (Milestone 2 evidence)
+# Consolidated owner test session — Saturday 10 October, morning (Milestone 2 evidence and new checks)
 
 One attended session of about 45–60 minutes. It collects all remaining Milestone 2 evidence in one sitting:
 R2–R5, the controlled failure check, `receipt_jobs` metadata, API spend and the cron cost.
@@ -64,6 +64,25 @@ start: …` and `Processed …`.
     - Render: the cron job's billed amount, plus the elapsed period from the cron job's creation time to now.
       This gives a 30-day projection, checked against the US$5/month threshold.
 
+## Additional checks (CTO plan of 7 October; include each only if its PR is released by Saturday)
+
+These come after step 9, when the normal command is restored and uploads have resumed. Mark any check whose
+release is not live as **not run**. It must not be recorded as passed.
+
+11. **Home project costs** (PR "Home project financial visibility").
+    - On Home, each project card shows **Recorded £…** and, where a budget is set, **£… left of £… budget**
+      or **£… over the £… budget**. A project without a budget says **No budget set**.
+    - After R2–R5, check that each project's Home figure matches its project page (Spent) to the penny.
+    - Check that unconfirmed drafts do not change it.
+12. **Unsaved receipt changes** (PR "Receipt-review unsaved edits").
+    - On a draft, type a value or tap **Assign**: an **Unsaved changes** indicator appears.
+    - Tap **Costs** (back): the browser warns before leaving.
+    - Save or Confirm: no warning appears.
+    - On iPhone this warning is best effort and may not show when closing the tab. Note what happened.
+13. **Reading connection feedback** (PR "Receipt-reading connection feedback").
+    - While a reading is waiting, turn on airplane mode for about 30 seconds: a connection message appears.
+    - Turn airplane mode off: the message clears, typed values are unchanged and no purchase is created.
+
 ## What to send back
 
 ```
@@ -79,4 +98,7 @@ D4 receipt_jobs log: [pasted]
 Restored (D5) + normal run ✓/✗
 API: consumed $__ of $5.00, balance $__
 Cron: created __ (UTC), checked __ (UTC), billed $__
+Home costs match project pages ✓/✗/not run; drafts excluded ✓/✗/not run
+Unsaved-changes indicator ✓/✗/not run; leave warning ✓/✗/not run; no warning on Save/Confirm ✓/✗/not run
+Connection message offline ✓/✗/not run; cleared online ✓/✗/not run; values kept ✓/✗/not run
 ```

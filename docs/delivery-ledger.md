@@ -16,8 +16,8 @@ business direction, samples and product feedback; founder approval is reserved f
 | # | Milestone | Due | State |
 |---|---|---|---|
 | 1 | Runtime and persistence decision | 5 Oct | **Accepted** (cron every minute, paid PG18, free web) |
-| 2 | Five live receipts through accurate confirmed costs | 8 Oct | **In progress**: R1 done; R2–R5 and checks outstanding |
-| 3 | Everyday founder use and friction fixes | 11 Oct | **Prepared** (`docs/milestone-3-plan.md`); starts after Milestone 2 |
+| 2 | Five live receipts through accurate confirmed costs | 8 Oct (target missed) | **Incomplete**: R1 done (founder-reported). R2–R5, the production failure check, `receipt_jobs` metadata, API spend and the cron-cost projection are **deferred to the owner session on Saturday 10 October** (CTO decision, 7 Oct) |
+| 3 | Everyday founder use and friction fixes | 11 Oct | **In progress**: product fixes from the assessment (#3–#5 released). The CTO plan of 7 Oct adds three PRs: Home project costs, receipt unsaved-changes warning, reading connection feedback. Founder use and the friction log start with the Saturday session |
 | 4 | Retained-data and deployment readiness, including a recovery check | 14 Oct | **Route A selected**; helper released (`e14a0e3`, verified); drill **held** pending quote approval — incomplete |
 | 5 | Final validation and founder go-live | 16 Oct | Not started |
 

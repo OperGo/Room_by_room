@@ -6,7 +6,7 @@ from django.shortcuts import render
 from django.templatetags.static import static
 
 from apps.core.dates import local_today, this_weekend_saturday
-from apps.costs.selectors import project_net_costs
+from apps.costs.selectors import project_cost_summaries
 from apps.projects.models import Project
 from apps.projects.services import project_progress, ready_tasks
 from apps.receipts.models import ReceiptDraft
@@ -21,10 +21,11 @@ def home(request):
         .annotate(last_activity=Max("tasks__completed_at"))
         .order_by("status", F("last_activity").desc(nulls_last=True), "-updated_at")
     )
-    costs = project_net_costs(owner, projects)
+    costs = project_cost_summaries(owner, projects)
     for project in projects:
         project.progress = project_progress(project)
-        project.net_cost = costs[project.pk]
+        project.costs = costs[project.pk]  # confirmed records and opening estimates only; drafts never count
+        project.net_cost = project.costs.net
     featured = next((p for p in projects if p.status == Project.Status.ACTIVE), projects[0] if projects else None)
     others = [p for p in projects if p is not featured]
     saturday = this_weekend_saturday()
